@@ -16,6 +16,7 @@ CWARNSCPP= \
 	-Wdouble-promotion \
 	-Wlogical-op \
 	-Wno-aggressive-loop-optimizations \
+	-Wno-type-limits \
         # the next warnings might be useful sometimes,
 	# but usually they generate too much noise
 	# -Werror \
@@ -158,6 +159,16 @@ guess:
 	@echo Guessing `$(UNAME)`
 	@$(MAKE) `$(UNAME)`
 
+shuffle:
+	@echo Building Base Lua
+	$(MAKE) clean
+	$(MAKE) guess
+	@echo Shuffling opcode set
+	./lua opcodes/sort.lua --output=opcodes/shuffle/.
+	@echo Building Shuffled Lua
+	$(MAKE) clean
+	$(MAKE) OPCODE="opcodes/shuffle/" guess 
+	
 AIX aix:
 	$(MAKE) $(ALL) CC="xlc" CFLAGS="-O2 -DLUA_USE_POSIX -DLUA_USE_DLOPEN" SYSLIBS="-ldl" SYSLDFLAGS="-brtl -bexpall"
 

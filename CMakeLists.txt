@@ -109,6 +109,7 @@ ADD_COMPILE_OPTIONS (-fPIC
     -Wdouble-promotion
     -Wlogical-op
     -Wno-aggressive-loop-optimizations
+    -Wno-type-limits
     # the next warnings might be useful sometimes, but usually they generate too much noise
     # -Werror
     -Wconversion
