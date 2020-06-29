@@ -790,6 +790,13 @@
   #endif
 #endif
 
+/* Consolidate the macros below ... */
+#if defined(GRIT_POWER_SHAREDTYPES)
+  #if !defined(GRIT_POWER_SHAREDGC)
+    #define GRIT_POWER_SHAREDGC
+  #endif
+#endif
+
 #if defined(GRIT_POWER_SHAREDGC)
   #if !defined(GRIT_POWER_SSID)
     #define GRIT_POWER_SSID

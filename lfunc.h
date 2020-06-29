@@ -65,5 +65,12 @@ LUAI_FUNC void luaF_freeproto (lua_State *L, Proto *f);
 LUAI_FUNC const char *luaF_getlocalname (const Proto *func, int local_number,
                                          int pc);
 
+#if defined(GRIT_POWER_SHAREDTYPES)
+/*
+** Mark a function prototype as "shared" and extend its life indefinitely (or at
+** least until marked unshared after that feature has been thoroughly tested).
+**/
+LUAI_FUNC void luaF_shareproto (Proto *func);
+#endif
 
 #endif

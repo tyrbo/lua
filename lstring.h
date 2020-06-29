@@ -73,4 +73,13 @@ LUAI_FUNC TString *luaS_createlngstrobj (lua_State *L, size_t l);
 */
 LUAI_FUNC TString *luaS_newblob (lua_State *L, size_t l);
 
+#if defined(GRIT_POWER_SHAREDTYPES)
+/*
+** Mark a string as "shared": give it a unique (process-global) identifier and
+** extend its life indefinitely (or at least until marked unshared after that
+** feature has been thoroughly tested).
+**/
+LUAI_FUNC void luaS_share (TString *ts);
+#endif
+
 #endif

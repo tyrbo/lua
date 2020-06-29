@@ -297,3 +297,24 @@ const char *luaF_getlocalname (const Proto *f, int local_number, int pc) {
   return NULL;  /* not found */
 }
 
+#if defined(GRIT_POWER_SHAREDTYPES)
+#include "lstring.h"
+
+void luaF_shareproto (Proto *f) {
+  if (f != NULL && !isshared(f)) {
+    int i;
+
+    makeshared(f);
+    luaS_share(f->source);
+    for (i = 0; i < f->sizek; i++) {
+      const TValue *o = &(f->k[i]);
+      if (ttype(o) == LUA_TSTRING)
+        luaS_share(tsvalue(o));
+    }
+
+    for (i = 0; i < f->sizeupvalues; i++) luaS_share(f->upvalues[i].name);
+    for (i = 0; i < f->sizelocvars; i++) luaS_share(f->locvars[i].varname);
+    for (i = 0; i < f->sizep; i++) luaF_shareproto(f->p[i]);
+  }
+}
+#endif

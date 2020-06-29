@@ -542,6 +542,16 @@ static int luaB_defer (lua_State *L) {
 }
 #endif
 
+#if defined(GRIT_POWER_SHAREDTYPES)
+static int luaB_isshared (lua_State *L) {
+  int i, top = lua_gettop(L);
+  for (i = 1; i <= top; ++i) {
+    luaL_checkany(L, i);
+    lua_pushboolean(L, lua_isshared(L, i));
+  }
+  return top;
+}
+#endif
 
 static const luaL_Reg base_funcs[] = {
   {"assert", luaB_assert},
@@ -569,6 +579,9 @@ static const luaL_Reg base_funcs[] = {
   {"xpcall", luaB_xpcall},
 #if defined(GRIT_DEFER)
   {"defer", luaB_defer},
+#endif
+#if defined(GRIT_POWER_SHAREDTYPES)  /* temporary home */
+  {"shared", luaB_isshared},
 #endif
   /* placeholders */
 

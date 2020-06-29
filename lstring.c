@@ -355,3 +355,15 @@ Udata *luaS_newudata (lua_State *L, size_t s, int nuvalue) {
   return u;
 }
 
+#if defined(GRIT_POWER_SHAREDTYPES)
+/* @TODO: Replace */
+static size_t shared_atomid_ctr = 0;
+
+void luaS_share (TString *ts) {
+  if (ts != NULL) {
+    makeshared(ts);
+    /* @TODO: AddAndFetch */
+    ts->id = (++shared_atomid_ctr);
+  }
+}
+#endif

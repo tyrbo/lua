@@ -1244,6 +1244,16 @@ LUA_API int lua_pcallk (lua_State *L, int nargs, int nresults, int errfunc,
   return status;
 }
 
+/* set global table as 1st upvalue of 'f' (may be LUA_ENV) */
+static void set_closure_env (lua_State *L, LClosure *f) {
+  if (f->nupvalues >= 1) {  /* does it have an upvalue? */
+    /* get global table from registry */
+    Table *reg = hvalue(&G(L)->l_registry);
+    const TValue *gt = luaH_getint(reg, LUA_RIDX_GLOBALS);
+    setobj(L, f->upvals[0]->v, gt);
+    luaC_barrier(L, f->upvals[0], gt);
+  }
+}
 
 LUA_API int lua_load (lua_State *L, lua_Reader reader, void *data,
                       const char *chunkname, const char *mode) {
@@ -1255,14 +1265,7 @@ LUA_API int lua_load (lua_State *L, lua_Reader reader, void *data,
   status = luaD_protectedparser(L, &z, chunkname, mode);
   if (status == LUA_OK) {  /* no errors? */
     LClosure *f = clLvalue(s2v(L->top - 1));  /* get newly created function */
-    if (f->nupvalues >= 1) {  /* does it have an upvalue? */
-      /* get global table from registry */
-      Table *reg = hvalue(&G(L)->l_registry);
-      const TValue *gt = luaH_getint(reg, LUA_RIDX_GLOBALS);
-      /* set global table as 1st upvalue of 'f' (may be LUA_ENV) */
-      setobj(L, f->upvals[0]->v, gt);
-      luaC_barrier(L, f->upvals[0], gt);
-    }
+    set_closure_env(L, f);
   }
   lua_unlock(L);
   return status;
@@ -1666,4 +1669,208 @@ lua_Integer luaO_HashRageString (const char* string) {
   hash += (hash << 15);
   return (lua_Integer)(int)hash;
 }
+#endif
+
+#if defined(GRIT_POWER_SHAREDTYPES)
+#include "lauxlib.h"
+
+/* Helper function for sharing tables */
+static void table_share_recursive (lua_State *L);
+
+/* Return true if the closure has at most one upvalue and that is _ENV */
+static int onlyglobalupval (lua_State *L, LClosure *f, const char **name) {
+  const Proto *p = f->p;
+  const TValue *gt = luaH_getint(hvalue(&G(L)->l_registry), LUA_RIDX_GLOBALS);
+  if (p->sizeupvalues > 1) {
+    *name = "too many upvalues";
+    return 0;
+  }
+  else if (p->sizeupvalues == 1 && gcvalue(gt) != gcvalue(f->upvals[0]->v)) {
+    TString *tname = p->upvalues[0].name;
+    *name = (tname == NULL) ? "(no name)" : getstr(tname);
+    return 0;
+  }
+  return 1;
+}
+
+LUA_API int lua_isshared (lua_State *L, int index) {
+  const TValue *o = index2value(L, index);
+  if (isvalid(L, o) && iscollectable(o)) {
+    if (ttisLclosure(o))
+      return isshared(clLvalue(o)->p);
+    return isshared(gcvalue(o));
+  }
+  return 0;
+}
+
+LUA_API void lua_sharestring (lua_State *L, int index) {
+  TValue *o = index2value(L, index);
+  if (!ttisstring(o)) {
+    if (!cvt2str(o)) {  /* not convertible? */
+      luaG_runerror(L, "value cannot be shared as a string");
+    }
+
+    lua_lock(L);  /* 'luaO_tostring' may create a new string */
+    luaO_tostring(L, o);
+    luaC_checkGC(L);
+    o = index2value(L, index);  /* previous call may reallocate the stack */
+    lua_unlock(L);
+  }
+  luaS_share(tsvalue(o));
+}
+
+LUA_API void lua_clonestring (lua_State *L, const void *s) {
+  TString *o = (s == NULL) ? NULL : cast(TString *, s);
+  if (o != NULL && isshared(o)) {
+    lua_lock(L);
+    setsvalue2s(L, L->top, o);
+    api_incr_top(L);
+    lua_unlock(L);
+  }
+  else {
+    luaG_runerror(L, "string nil or not declared as shared");
+  }
+}
+
+LUA_API void lua_sharefunction (lua_State *L, int index) {
+  if (lua_isfunction(L, index) && !lua_iscfunction(L, index)) {
+    const char *name = NULL;
+    LClosure *f = clLvalue(index2value(L, index));
+    if (!onlyglobalupval(L, f, &name))
+      luaG_runerror(L, "cannot share function with upvalue(s): %s", name);
+    luaF_shareproto(f->p);
+  }
+  else
+    luaG_runerror(L, "Lua function expected");
+}
+
+LUA_API void lua_clonefunction (lua_State *L, const void *fp) {
+  const LClosure *f = (fp == NULL) ? NULL : cast(LClosure *, fp);
+  if (f != NULL && isshared(f->p)) {
+    LClosure *cl;
+    lua_lock(L);
+    cl = luaF_newLclosure(L, f->nupvalues);
+    setclLvalue2s(L, L->top, cl); api_incr_top(L);  /* anchor it */
+    cl->p = f->p;
+    luaF_initupvals(L, cl);
+    set_closure_env(L, cl);
+    lua_unlock(L);
+  }
+  else {
+    luaG_runerror(L, "function nil or not declared as shared");
+  }
+}
+
+LUA_API void lua_sharetable (lua_State *L, int index) {
+  api_check(L, lua_istable(L, index), "table expected");
+  lua_pushvalue(L, index);  /* value */
+  table_share_recursive(L);
+  lua_pop(L, 1);  /* pops: value */
+}
+
+LUA_API void lua_clonetable (lua_State *L, const void *tp) {
+  Table *t = (tp == NULL) ? NULL : cast(Table *, tp);
+  if (t != NULL && isshared(t)) {
+    lua_lock(L);
+    sethvalue2s(L, L->top, t);
+    api_incr_top(L);
+    lua_unlock(L);
+  }
+  else {
+    luaG_runerror(L, "table nil or not declared as shared");
+  }
+}
+
+static void table_share_recursive (lua_State *L) {
+  Table *t = gettable(L, -1);
+  if (isshared(t))
+    return;  /* No need to iterate through its children */
+
+  /*
+  ** If the table has a metatable, share the table iff its metatable is already
+  ** shared; possibly expand on this in future versions...
+  */
+  if (lua_getmetatable(L, -1)) {
+    const Table *mt = gettable(L, -1);
+    lua_pop(L, 1);  /* metatable */
+    if (!isshared(mt))
+      luaG_runerror(L, "cannot share a table with an unshared metatable");
+  }
+  lua_pop(L, 1);  /* metatable */
+  luaL_checkstack(L, 4, NULL);  /* ensure iterator space */
+
+  /*
+  ** Iterate through the contents to validate preconditions before setting any
+  ** shared bits.
+  */
+  lua_pushnil(L);
+  while (lua_next(L, -2) != 0) {
+    int i;
+    const TValue *key = index2value(L, -2);
+
+    /* tables cannot share the "__mode" field */
+    if (ttisstring(key)) {
+      const char *name = svalue(key);
+      if (name != NULL && strcmp("__mode", name) == 0) {
+        luaG_runerror(L, "cannot share table with __mode field");
+      }
+    }
+
+    /* functions w/ upvalues (key or value of table) */
+    for (i = 0; i < 2; i++) {
+      int index = -i - 1;
+      if (lua_isfunction(L, index) && !lua_iscfunction(L, index)) {
+        const char *name = NULL;
+        LClosure *f = clLvalue(index2value(L, index));
+        if (!onlyglobalupval(L, f, &name))
+          luaG_runerror(L, "cannot share function with upvalue(s): %s", name);
+      }
+    }
+
+    /* @TODO: to-be-closed upvalues (?) */
+
+    /*
+    ** @TODO: For each table key or value verify that it can shared, i.e.,
+    **  follow the same logic above and track for table-cycles: Push a temporary
+    **  lua_newtable on the stack that stores each table already processed (and
+    **  cache its index), then ensure each subtable is not in that table.
+    **
+    ** This should be done before any makeshared calls.
+    */
+
+    lua_pop(L, 1);  /* pop value */
+  }
+
+  makeshared(t);
+  lua_pushnil(L);
+  while (lua_next(L, -2) != 0) {
+    int i = 0;
+    for (i = 0; i < 2; i++) {  /* For each key & value */
+      int index = -i - 1;
+      switch (lua_type(L, index)) {
+        case LUA_TNUMBER:
+        case LUA_TVECTOR:
+        case LUA_TBOOLEAN:
+        case LUA_TLIGHTUSERDATA:
+          break;  /* No additional measures required */
+        case LUA_TTABLE:
+          table_share_recursive(L);
+          break;
+        case LUA_TSTRING:
+          lua_sharestring(L, index);
+          break;
+        case LUA_TFUNCTION:
+          if (lua_isfunction(L, index) && !lua_iscfunction(L, index))
+            lua_sharefunction(L, index);
+          break;
+        default:
+          luaG_runerror(L, "unexpected type: %s", lua_typename(L, lua_type(L, index)));
+          break;
+      }
+    }
+
+    lua_pop(L, 1);  /* pop value */
+  }
+}
+
 #endif

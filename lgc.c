@@ -598,8 +598,19 @@ static int traversethread (global_State *g, lua_State *th) {
 */
 static lu_mem propagatemark (global_State *g) {
   GCObject *o = g->gray;
+  if (isshared(o))
+    return 0;  /* @TODO: [Experimental] don't colour shared objects */
+
   gray2black(o);
   g->gray = *getgclist(o);  /* remove from 'gray' list */
+
+  /*
+  ** @TODO: [Experimental] Allow the Lclosure object to be coloured black,
+  **      but don't mark the upvalues of shared closures.
+  */
+  if (o->tt == LUA_VLCL && isshared(gco2lcl(o)->p))
+    return 0;
+
   switch (o->tt) {
     case LUA_VTABLE: return traversetable(g, gco2t(o));
     case LUA_VUSERDATA: return traverseudata(g, gco2u(o));

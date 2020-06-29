@@ -278,6 +278,15 @@ LUA_API void  (lua_pushboolean) (lua_State *L, int b);
 LUA_API void  (lua_pushlightuserdata) (lua_State *L, void *p);
 LUA_API int   (lua_pushthread) (lua_State *L);
 
+#if defined(GRIT_POWER_SHAREDTYPES)
+LUA_API int   (lua_isshared) (lua_State *L, int index);
+LUA_API void  (lua_sharestring) (lua_State *L, int index);
+LUA_API void  (lua_clonestring) (lua_State *L, const void *s);
+LUA_API void  (lua_sharefunction) (lua_State *L, int index);
+LUA_API void  (lua_clonefunction) (lua_State *L, const void *fp);
+LUA_API void  (lua_sharetable) (lua_State *L, int index);
+LUA_API void  (lua_clonetable) (lua_State *L, const void *t);
+#endif
 
 /*
 ** get functions (Lua -> stack)
