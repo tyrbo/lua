@@ -801,7 +801,7 @@ LUA_API int lua_pushthread (lua_State *L) {
 static int auxgetstr (lua_State *L, const TValue *t, const char *k) {
   const TValue *slot;
   TString *str = luaS_new(L, k);
-  if (luaV_fastget(L, t, str, slot, luaH_getstr)) {
+  if (luaV_fastusget(L, t, str, slot, luaH_getstr)) {
     setobj2s(L, L->top, slot);
     api_incr_top(L);
   }
@@ -1016,7 +1016,7 @@ LUA_API void lua_settable (lua_State *L, int idx) {
   lua_lock(L);
   api_checknelems(L, 2);
   t = index2value(L, idx);
-  if (luaV_fastget(L, t, s2v(L->top - 2), slot, luaH_get)) {
+  if (luaV_fastusget(L, t, s2v(L->top - 2), slot, luaH_get)) {
     luaV_finishfastset(L, t, slot, s2v(L->top - 1));
   }
   else
@@ -1038,7 +1038,7 @@ LUA_API void lua_seti (lua_State *L, int idx, lua_Integer n) {
   lua_lock(L);
   api_checknelems(L, 1);
   t = index2value(L, idx);
-  if (luaV_fastgeti(L, t, n, slot)) {
+  if (luaV_fastusgeti(L, t, n, slot)) {
     luaV_finishfastset(L, t, slot, s2v(L->top - 1));
   }
   else {
@@ -1104,6 +1104,8 @@ LUA_API int lua_setmetatable (lua_State *L, int objindex) {
   }
   switch (ttype(obj)) {
     case LUA_TTABLE: {
+      if (isshared(hvalue(obj)))
+        luaG_runerror(L, "can't setmetatable to shared table");
       hvalue(obj)->metatable = mt;
       if (mt) {
         luaC_objbarrier(L, gcvalue(obj), mt);

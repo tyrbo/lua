@@ -335,6 +335,8 @@ void luaV_finishset (lua_State *L, const TValue *t, TValue *key,
     const TValue *tm;  /* '__newindex' metamethod */
     if (slot != NULL) {  /* is 't' a table? */
       Table *h = hvalue(t);  /* save 't' table */
+      if(isshared(h))  /* @TODO: Alleviate this condition basedo on ownership. */
+        luaG_runerror(L, "attempting to luaV_finishset a shared table");
       lua_assert(isempty(slot));  /* slot must be empty */
       tm = fasttm(L, h->metatable, TM_NEWINDEX);  /* get metamethod */
       if (tm == NULL) {  /* no metamethod? */
@@ -363,7 +365,7 @@ void luaV_finishset (lua_State *L, const TValue *t, TValue *key,
       return;
     }
     t = tm;  /* else repeat assignment over 'tm' */
-    if (luaV_fastget(L, t, key, slot, luaH_get)) {
+    if (luaV_fastusget(L, t, key, slot, luaH_get)) {
       luaV_finishfastset(L, t, slot, val);
       return;  /* done */
     }
@@ -1429,7 +1431,7 @@ void luaV_execute (lua_State *L, CallInfo *ci) {
         TValue *rb = KB(i);
         TValue *rc = RKC(i);
         TString *key = tsvalue(rb);  /* key must be a string */
-        if (luaV_fastget(L, upval, key, slot, luaH_getshortstr)) {
+        if (luaV_fastusget(L, upval, key, slot, luaH_getshortstr)) {
           luaV_finishfastset(L, upval, slot, rc);
         }
         else
@@ -1442,8 +1444,8 @@ void luaV_execute (lua_State *L, CallInfo *ci) {
         TValue *rc = RKC(i);  /* value */
         lua_Unsigned n;
         if (ttisinteger(rb)  /* fast track for integers? */
-            ? (cast_void(n = ivalue(rb)), luaV_fastgeti(L, s2v(ra), n, slot))
-            : luaV_fastget(L, s2v(ra), rb, slot, luaH_get)) {
+            ? (cast_void(n = ivalue(rb)), luaV_fastusgeti(L, s2v(ra), n, slot))
+            : luaV_fastusget(L, s2v(ra), rb, slot, luaH_get)) {
           luaV_finishfastset(L, s2v(ra), slot, rc);
         }
         else
@@ -1454,7 +1456,7 @@ void luaV_execute (lua_State *L, CallInfo *ci) {
         const TValue *slot;
         int c = GETARG_B(i);
         TValue *rc = RKC(i);
-        if (luaV_fastgeti(L, s2v(ra), c, slot)) {
+        if (luaV_fastusgeti(L, s2v(ra), c, slot)) {
           luaV_finishfastset(L, s2v(ra), slot, rc);
         }
         else {
@@ -1469,7 +1471,7 @@ void luaV_execute (lua_State *L, CallInfo *ci) {
         TValue *rb = KB(i);
         TValue *rc = RKC(i);
         TString *key = tsvalue(rb);  /* key must be a string */
-        if (luaV_fastget(L, s2v(ra), key, slot, luaH_getshortstr)) {
+        if (luaV_fastusget(L, s2v(ra), key, slot, luaH_getshortstr)) {
           luaV_finishfastset(L, s2v(ra), slot, rc);
         }
         else

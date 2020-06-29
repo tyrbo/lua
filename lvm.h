@@ -99,6 +99,13 @@ typedef enum {
       !isempty(slot)))  /* result not empty? */
 
 
+/* fast-unshared-get */
+#define luaV_fastusget(L,t,k,slot,f) (luaV_fastget(L,t,k,slot,f)) && !isshared(hvalue(t))
+
+/* fast-unshared-getinteger */
+#define luaV_fastusgeti(L,t,k,slot) (luaV_fastgeti(L,t,k,slot)) && !isshared(hvalue(t))
+
+
 /*
 ** Finish a fast set operation (when fast get succeeds). In that case,
 ** 'slot' points to the place to put the value.

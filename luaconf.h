@@ -790,6 +790,12 @@
   #endif
 #endif
 
+#if defined(GRIT_POWER_SHAREDGC)
+  #if !defined(GRIT_POWER_SSID)
+    #define GRIT_POWER_SSID
+  #endif
+#endif
+
 /*
 ** {==================================================================
 ** Vector API
