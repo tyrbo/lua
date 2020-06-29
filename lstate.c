@@ -55,7 +55,7 @@ typedef struct LG {
 ** A macro to create a "random" seed when a state is created;
 ** the seed is used to randomize string hashes.
 */
-#if !defined(luai_makeseed)
+#if !defined(GRIT_POWER_SSID) && !defined(luai_makeseed)
 
 #include <time.h>
 
@@ -400,7 +400,11 @@ LUA_API lua_State *lua_newstate (lua_Alloc f, void *ud) {
   g->warnf = NULL;
   g->ud_warn = NULL;
   g->mainthread = L;
+#if defined(GRIT_POWER_SSID)
+  g->seed = 0;
+#else
   g->seed = luai_makeseed(L);
+#endif
   g->gcrunning = 0;  /* no GC while building state */
   g->strt.size = g->strt.nuse = 0;
   g->strt.hash = NULL;

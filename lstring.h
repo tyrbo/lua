@@ -38,13 +38,26 @@
 /*
 ** equality for short strings, which are always internalized
 */
+#if defined(GRIT_POWER_SSID)
+
+/* References are equal or non-zero IDs are equal */
+#define eqinstshrstr(a, b) (((a) == (b)) || ((a)->id == (b)->id && (a)->id != 0))
+
+#define eqshrstr(a,b)	check_exp((a)->tt == LUA_VSHRSTR, eqinstshrstr(a, b) || \
+  ((a)->hash == (b)->hash && luaS_eqshrstr(a,b)))  /* memcmp the shrstrs */
+
+#else
 #define eqshrstr(a,b)	check_exp((a)->tt == LUA_VSHRSTR, (a) == (b))
+#endif
 
 
 LUAI_FUNC unsigned int luaS_hash (const char *str, size_t l,
                                   unsigned int seed, size_t step);
 LUAI_FUNC unsigned int luaS_hashlongstr (TString *ts);
 LUAI_FUNC int luaS_eqlngstr (TString *a, TString *b);
+#if defined(GRIT_POWER_SSID)
+LUAI_FUNC int luaS_eqshrstr (TString *a, TString *b);
+#endif
 LUAI_FUNC void luaS_resize (lua_State *L, int newsize);
 LUAI_FUNC void luaS_clearcache (global_State *g);
 LUAI_FUNC void luaS_init (lua_State *L);

@@ -130,12 +130,71 @@ void luaS_clearcache (global_State *g) {
 
 
 /*
+** A macro to create a "random" seed when a state is created;
+** the seed is used to randomize string hashes.
+*/
+#if defined(GRIT_POWER_SSID)
+
+/* static & shared seed for all Lua runtimes of this process */
+static unsigned int static_gseed = 0;
+
+int luaS_eqshrstr (TString *a, TString *b) {
+  lua_assert(a->tt == LUA_VSHRSTR && b->tt == LUA_VSHRSTR);
+  if (eqinstshrstr(a, b))  /* same instance or... */
+    return 1;
+  if ((a->shrlen == b->shrlen) &&  /* equal length and ... */
+     (memcmp(getstr(a), getstr(b), a->shrlen) == 0)) {  /* equal contents */
+
+    /* copy identifiers to reduce future comparisons */
+    a->id = (a->id > b->id) ? a->id : b->id;
+    b->id = (a->id > b->id) ? a->id : b->id;
+    return 1;
+  }
+  return 0;
+}
+
+/*
+** A macro to create a "random" seed when a state is created;
+** the seed is used to randomize string hashes.
+*/
+#if !defined(luai_makeseed)
+#include <time.h>
+
+/*
+** Compute an initial seed with some level of randomness.
+** Rely on Address Space Layout Randomization (if present) and
+** current time.
+*/
+#define addbuff(b,p,e) \
+  { size_t t = cast_sizet(e); \
+    memcpy(b + p, &t, sizeof(t)); p += sizeof(t); }
+
+static unsigned int luai_makeseed (lua_State *L) {
+  char buff[3 * sizeof(size_t)];
+  unsigned int h = cast_uint(time(NULL));
+  int p = 0;
+  addbuff(buff, p, L);  /* heap variable */
+  addbuff(buff, p, &h);  /* local variable */
+  addbuff(buff, p, &lua_newstate);  /* public function */
+  lua_assert(p == sizeof(buff));
+  return luaS_hash(buff, p, h, 1);
+}
+#endif  /* luai_makeseed */
+#endif  /* GRIT_POWER_SSID */
+
+
+/*
 ** Initialize the string table and the string cache
 */
 void luaS_init (lua_State *L) {
   global_State *g = G(L);
   int i, j;
   stringtable *tb = &G(L)->strt;
+#if defined(GRIT_POWER_SSID)
+  /* @TODO: Mutex */
+  if (static_gseed == 0) static_gseed = luai_makeseed(L);
+  if (g->seed == 0) g->seed = static_gseed;
+#endif
   tb->hash = luaM_newvector(L, MINSTRTABSIZE, TString*);
   tablerehash(tb->hash, 0, MINSTRTABSIZE);  /* clear array */
   tb->size = MINSTRTABSIZE;
@@ -161,6 +220,9 @@ static TString *createstrobj (lua_State *L, size_t l, int tag, unsigned int h) {
   ts = gco2ts(o);
   ts->hash = h;
   ts->extra = 0;
+#if defined(GRIT_POWER_SSID)
+  ts->id = 0;
+#endif
   getstr(ts)[l] = '\0';  /* ending 0 */
   return ts;
 }

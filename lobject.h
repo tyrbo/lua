@@ -394,6 +394,9 @@ typedef struct TString {
   lu_byte extra;  /* reserved words for short strings; "has hash" for longs */
   lu_byte shrlen;  /* length for short strings */
   unsigned int hash;
+#if defined(GRIT_POWER_SSID)
+  size_t id;	/* id for short strings */
+#endif
   union {
     size_t lnglen;  /* length for long strings */
     struct TString *hnext;  /* linked list for hash table */
