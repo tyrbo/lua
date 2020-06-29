@@ -1307,7 +1307,7 @@ static int Cfunck (lua_State *L, int status, lua_KContext ctx);
 ** LUA_OPUNM   -> _
 ** LUA_OPBNOT  -> !
 */
-static const char ops[] = "+-*%^/\\&|~<>_!";
+#include "opr_ltest.h"
 
 static int runC (lua_State *L, lua_State *L1, const char *pc) {
   char buff[300];

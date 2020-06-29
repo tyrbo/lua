@@ -1626,7 +1626,7 @@ void luaV_execute (lua_State *L, CallInfo *ci) {
         TValue *rb = vRB(i);
         TMS tm = (TMS)GETARG_C(i);
         StkId result = RA(pi);
-        lua_assert(OP_ADD <= GET_OPCODE(pi) && GET_OPCODE(pi) <= OP_SHR);
+        lua_assert(foldop(GET_OPCODE(pi)));
         Protect(luaT_trybinTM(L, s2v(ra), rb, result, tm));
         vmbreak;
       }

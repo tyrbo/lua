@@ -51,7 +51,7 @@ CWARNS= $(CWARNSCPP) $(CWARNSC)
 PLAT= guess
 
 CC= gcc -std=gnu99
-CFLAGS= -O2 -Wall -Wextra -DLUA_COMPAT_5_3 $(SYSCFLAGS) $(MYCFLAGS)
+CFLAGS= -O2 -Wall -Wextra -DLUA_COMPAT_5_3 $(SYSCFLAGS) $(MYCFLAGS) -I$(OPCODE)
 LDFLAGS= $(SYSLDFLAGS) $(MYLDFLAGS)
 LIBS= -lm $(SYSLIBS) $(MYLIBS)
 
@@ -59,6 +59,7 @@ AR= ar rc
 RANLIB= ranlib
 RM= rm -f
 UNAME= uname
+OPCODE= opcodes/base/
 
 SYSCFLAGS=
 SYSLDFLAGS=
