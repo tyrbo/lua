@@ -14,6 +14,7 @@
 
 #include "llimits.h"
 #include "lua.h"
+#include "lglm.hpp"
 
 
 /*
@@ -49,7 +50,7 @@
 typedef union LUA_ALIGNED_(16) Value {
   struct GCObject *gc;    /* collectable objects */
   void *p;         /* light userdata */
-  lua_Float4 f4;   /* vector and quaternion stub */
+  glmVector f4;    /* vector and quaternion stub */
   lua_CFunction f; /* light C functions */
   lua_Integer i;   /* integer numbers */
   lua_Number n;    /* float numbers */
@@ -821,7 +822,7 @@ typedef struct Table {
 
 typedef struct GCMatrix {
   CommonHeader;
-  lua_Mat4 mat4;
+  glmMatrix mat4;
 } GCMatrix;
 
 #define LUA_VMATRIX makevariant(LUA_TMATRIX, 0)

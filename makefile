@@ -62,7 +62,8 @@ CWARNSC= -Wdeclaration-after-statement \
 # Your platform. See PLATS for possible values.
 PLAT= guess
 
-CC= gcc -std=gnu99 $(CWARNSCPP) $(CWARNSC) $(CWARNGCC)
+#CC= gcc -std=gnu99 $(CWARNSCPP) $(CWARNSC) $(CWARNGCC)
+CC= g++ -std=c++11 $(CWARNSCPP) $(CWARNGCC)
 CPP= g++ -std=c++11 $(CWARNSCPP) $(CWARNGCC)
 CFLAGS= -O2 -fstrict-aliasing -Wall -Wextra -DNDEBUG -DLUA_COMPAT_5_3 $(SYSCFLAGS) $(MYCFLAGS)
 CPERF_FLAGS = -O3 -fstrict-aliasing -march=native -fno-plt -fno-stack-protector -ffast-math # -flto
@@ -200,7 +201,7 @@ linux-readline:
 	$(MAKE) $(ALL) SYSCFLAGS="-DLUA_USE_LINUX -DLUA_USE_READLINE" SYSLIBS="-Wl,-E -ldl -lreadline"
 
 linux-one:
-	$(MAKE) linux-readline CC="$(CPP)" LUA_O="onelua.o" BASE_O="onelua.o" CORE_O="" LIB_O="" LUAC_T="" MYCFLAGS="$(MYCFLAGS) $(CPERF_FLAGS) -DLUA_INCLUDE_LIBGLM -I. -Ilibs/glm-binding"
+	$(MAKE) linux-readline CC="$(CPP)" LUA_O="onelua.o" BASE_O="onelua.o" CORE_O="" LIB_O="" LUAC_T="" MYCFLAGS="$(MYCFLAGS) $(CPERF_FLAGS) -I. -Ilibs/glm-binding"
 
 Darwin macos macosx:
 	$(MAKE) $(ALL) SYSCFLAGS="-DLUA_USE_MACOSX"
@@ -227,13 +228,13 @@ lglm.o: lglm.cpp lua.h luaconf.h lglm.hpp lua.hpp lualib.h \
  lauxlib.h lglm_core.h llimits.h ltm.h lobject.h lglm_string.hpp \
  lgrit_lib.h lapi.h lstate.h lzio.h lmem.h ldebug.h lfunc.h lgc.h \
  lstring.h ltable.h lvm.h ldo.h
-	$(CPP) -DLUA_C_LINKAGE $(CFLAGS) $(CPERF_FLAGS) $(TESTS) -c -o lglm.o lglm.cpp
+	$(CPP) $(CFLAGS) $(CPERF_FLAGS) $(TESTS) -c -o lglm.o lglm.cpp
 
 # lua-glm binding
 GLM_A = glm.so
 
 lib-glm:
-	$(CPP) -DLUA_C_LINKAGE $(CFLAGS) $(CPERF_FLAGS) $(TESTS) -fPIC -I. -Ilibs/glm-binding -shared -o $(GLM_A) libs/glm-binding/lglmlib.cpp $(LIBS)
+	$(CPP) $(CFLAGS) $(CPERF_FLAGS) $(TESTS) -fPIC -I. -Ilibs/glm-binding -shared -o $(GLM_A) libs/glm-binding/lglmlib.cpp $(LIBS)
 
 lib-glm-mingw:
 	$(MAKE) lib-glm SYSCFLAGS="-L . -DLUA_BUILD_AS_DLL" GLM_A="glm.dll" SYSLIBS="-llua" SYSLDFLAGS="-s"

@@ -451,9 +451,7 @@ Allow the preloading of libraries, e.g., ``lib = require('...')``, via command l
 Keep a persistent list of commands that have been run on the Lua interpreter. With the `LUA_HISTORY` environment variable used to declare the location history.
 
 ## Building
-The Lua core can be compiled as C or as C++ code. All functions required to integrate GLM into Lua are defined in [lglm_core.h](lglm_core.h), [lglm.hpp](lglm.hpp) provides the mechanism for aliasing the GLM structures across C/C++ boundaries, and the GLM/Lua integration is implemented in [lglm.cpp](lglm.cpp).
-
-As `lglm.cpp` must be compiled as C++, the preprocessor flag `LUA_C_LINKAGE` is used to synchronize the calling convention required to link it with the rest of Lua. Beware of language boundary issues!
+As of [LinkCommitHere](...), LuaGLM can only be compiled as C++ code.
 
 ### Make
 An modified version of the makefile [bundled](https://www.lua.org/download.html) with release versions of Lua. The same instructions apply:
@@ -489,7 +487,6 @@ Note, not all Lua-specific options are listed.
 
 - **Compilation**:
   - **ONE\_LUA**: Compile Lua core, libraries, and interpreter as a single file;
-  - **LUA\_C\_LINKAGE**: An indication to `lglm.cpp` that has C linkage;
   - **LUA\_NATIVE\_ARCH**: Enable compiler optimizations for the native processor architecture;
   - **LUA\_NO\_DUMP**: Disable the dump module (dumping Lua functions as precompiled chunks);
   - **LUA\_NO\_BYTECODE**: Disables the usage of lua_load with binary chunks;

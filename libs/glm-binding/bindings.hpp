@@ -20,11 +20,7 @@
 #ifndef __BINDING_LUA_BINDINGS_HPP__
 #define __BINDING_LUA_BINDINGS_HPP__
 #if !defined(LUA_API_LINKAGE)
-#if defined(LUA_C_LINKAGE)
-  #define LUA_API_LINKAGE "C"
-#else
   #define LUA_API_LINKAGE "C++"
-#endif
 #endif
 
 #include <string>
@@ -100,10 +96,10 @@ extern LUA_API_LINKAGE {
 
 /* TValue -> glmVector */
 #if !defined(glm_vecvalue)
-#define glm_mvalue(o) glm_constmat_boundary(mvalue_ref(o))
-#define glm_vvalue(o) glm_constvec_boundary(vvalue_ref(o))
-#define glm_vecvalue(o) check_exp(ttisvector(o), glm_constvec_boundary(&vvalue_(o)))
-#define glm_quatvalue(o) check_exp(ttisquat(o), glm_constvec_boundary(&vvalue_(o)))
+#define glm_mvalue(o) mvalue(o)
+#define glm_vvalue(o) vvalue(o)
+#define glm_vecvalue(o) vecvalue(o)
+#define glm_quatvalue(o) quatvalue(o)
 #endif
 
 /* index2value ported from lapi.c; simplified to only operate on positive stack indices */
@@ -571,7 +567,7 @@ struct gLuaBase {
       if (ttismatrix(o)) {
         LB.idx++;
 
-        glm_mat_boundary(mvalue_ref(o)) = m;
+        glm_mvalue(o) = m;
         setobj2s(L, L->top, o); // lua_pushvalue
         api_incr_top(L);
         lua_unlock(L);

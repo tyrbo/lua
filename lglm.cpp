@@ -8,16 +8,9 @@
 #define LUA_CORE
 
 /*
-@@ LUA_C_LINKAGE is a marker for linking objects against a Lua runtime built
-**  with a different linkage specification, e.g., linking C++ objects against
-**  a runtime compiled with C.
 @@ LUA_API_LINKAGE is a mark for the linkage specification to core API functions
 */
-#if defined(LUA_C_LINKAGE)
-  #define LUA_API_LINKAGE "C"
-#else
-  #define LUA_API_LINKAGE "C++"
-#endif
+#define LUA_API_LINKAGE "C++"
 
 extern LUA_API_LINKAGE {
   #include "luaconf.h"
@@ -130,9 +123,9 @@ static int mat_trybinTM(lua_State *L, const TValue *p1, const TValue *p2, StkId 
 #define glm_vvalue_raw(o) glm_constvec_boundary(&vvalue_raw(o))
 
 /* Future-proof for when/if quaternions have their own type tag */
-#define glm_vvalue(o) glm_constvec_boundary(vvalue_ref(o))
-#define glm_vecvalue(o) check_exp(ttisvector(o), glm_constvec_boundary(&vvalue_(o)))
-#define glm_quatvalue(o) check_exp(ttisquat(o), glm_constvec_boundary(&vvalue_(o)))
+#define glm_vvalue(o) vvalue(o)
+#define glm_vecvalue(o) vecvalue(o)
+#define glm_quatvalue(o) quatvalue(o)
 #define glm_setvvalue2s(s, x, o)        \
   LUA_MLM_BEGIN                         \
   TValue *io = s2v(s);                  \
@@ -140,7 +133,7 @@ static int mat_trybinTM(lua_State *L, const TValue *p1, const TValue *p2, StkId 
   settt_(io, (o));                      \
   LUA_MLM_END
 
-#define glm_mvalue(o) glm_constmat_boundary(mvalue_ref(o))
+#define glm_mvalue(o) mvalue(o)
 #define glm_setmvalue2s(L, o, x) glm_setmvalue(L, s2v(o), x)
 #define glm_setmvalue(L, obj, x) \
   LUA_MLM_BEGIN                  \
@@ -455,25 +448,25 @@ LUA_API int glm_unpack_vector(lua_State *L, int idx) {
   const TValue *o = glm_index2value(L, idx);
   switch (ttypetag(o)) {
     case LUA_VVECTOR2:
-      lua_pushnumber(L, cast_num(vecvalue(o).x));
-      lua_pushnumber(L, cast_num(vecvalue(o).y));
+      lua_pushnumber(L, cast_num(vecvalue(o).v2.x));
+      lua_pushnumber(L, cast_num(vecvalue(o).v2.y));
       return 2;
     case LUA_VVECTOR3:
-      lua_pushnumber(L, cast_num(vecvalue(o).x));
-      lua_pushnumber(L, cast_num(vecvalue(o).y));
-      lua_pushnumber(L, cast_num(vecvalue(o).z));
+      lua_pushnumber(L, cast_num(vecvalue(o).v3.x));
+      lua_pushnumber(L, cast_num(vecvalue(o).v3.y));
+      lua_pushnumber(L, cast_num(vecvalue(o).v3.z));
       return 3;
     case LUA_VVECTOR4:
-      lua_pushnumber(L, cast_num(vecvalue(o).x));
-      lua_pushnumber(L, cast_num(vecvalue(o).y));
-      lua_pushnumber(L, cast_num(vecvalue(o).z));
-      lua_pushnumber(L, cast_num(vecvalue(o).w));
+      lua_pushnumber(L, cast_num(vecvalue(o).v4.x));
+      lua_pushnumber(L, cast_num(vecvalue(o).v4.y));
+      lua_pushnumber(L, cast_num(vecvalue(o).v4.z));
+      lua_pushnumber(L, cast_num(vecvalue(o).v4.w));
       return 4;
     case LUA_VQUAT:
-      lua_pushnumber(L, cast_num(glm_quatvalue(o).q.w));
-      lua_pushnumber(L, cast_num(glm_quatvalue(o).q.x));
-      lua_pushnumber(L, cast_num(glm_quatvalue(o).q.y));
-      lua_pushnumber(L, cast_num(glm_quatvalue(o).q.z));
+      lua_pushnumber(L, cast_num(quatvalue(o).q.w));
+      lua_pushnumber(L, cast_num(quatvalue(o).q.x));
+      lua_pushnumber(L, cast_num(quatvalue(o).q.y));
+      lua_pushnumber(L, cast_num(quatvalue(o).q.z));
       return 4;
     default: {
       lua_pushvalue(L, idx);
@@ -1202,7 +1195,7 @@ LUA_API int lua_ismatrix (lua_State *L, int idx, int *size, int *secondary) {
 LUA_API int lua_tomatrix (lua_State *L, int idx, lua_Mat4 *matrix) {
   const TValue *o = glm_index2value(L, idx);
   if (ttismatrix(o) && matrix != GLM_NULLPTR) {
-    *matrix = mvalue(o);
+    *matrix = lua_constmat_boundary(mvalue_ref(o));
     return 1;
   }
   return 0;

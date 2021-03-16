@@ -47,12 +47,12 @@ static LUA_INLINE grit_length_t glm_dimensions (int rtt) {
 /// Helper function for generalized vector int-access.
 /// </summary>
 static LUA_INLINE int vecgeti (const TValue *obj, lua_Integer n, StkId res) {
-  grit_length_t _n = cast(grit_length_t, n);
+  glm::length_t _n = i_glmlen(n);
   if (l_likely(_n >= 1 && _n <= glm_dimensions(ttypetag(obj)))) {  // Accessing vectors is 0-based
 #if defined(GLM_FORCE_QUAT_DATA_WXYZ)  // Support GLM_FORCE_QUAT_DATA_WXYZ
     if (ttypetag(obj) == LUA_VQUAT) _n = (_n % 4) + 1;
 #endif
-    setfltvalue(s2v(res), cast_num((&vvalue_(obj).x)[_n - 1]));
+    setfltvalue(s2v(res), cast_num((&vvalue(obj).v4.x)[_n - 1]));
     return LUA_TNUMBER;
   }
   return LUA_TNONE;
@@ -62,26 +62,25 @@ static LUA_INLINE int vecgeti (const TValue *obj, lua_Integer n, StkId res) {
 /// Helper function for generalized vector string-access.
 /// </summary>
 static LUA_INLINE int vecgets (const TValue *obj, const char *k, StkId res) {
-  const grit_length_t _d = glm_dimensions(ttypetag(obj));
-  grit_length_t _n = 0;
+  glm::length_t _n = 0;
   switch (*k) {
     case 'x': case 'r': case '1': _n = 1; break;
     case 'y': case 'g': case '2': _n = 2; break;
     case 'z': case 'b': case '3': _n = 3; break;
     case 'w': case 'a': case '4': _n = 4; break;
     case 'n': {  // Dimension fields takes priority over metamethods
-      setivalue(s2v(res), (lua_Integer)_d);
+      setivalue(s2v(res), i_luaint(glm_dimensions(ttypetag(obj))));
       return LUA_TNUMBER;
     }
     default:
       break;
   }
 
-  if (l_likely(_n >= 1 && _n <= _d)) {
+  if (l_likely(_n >= 1 && _n <= glm_dimensions(ttypetag(obj)))) {
 #if defined(GLM_FORCE_QUAT_DATA_WXYZ)  // Support GLM_FORCE_QUAT_DATA_WXYZ
     if (ttypetag(obj) == LUA_VQUAT) _n = (_n % 4) + 1;
 #endif
-    setfltvalue(s2v(res), cast_num((&(vvalue_ref(obj)->x))[_n - 1]));
+    setfltvalue(s2v(res), cast_num((&vvalue(obj).v4.x)[_n - 1]));
     return LUA_TNUMBER;
   }
   return LUA_TNONE;
@@ -151,21 +150,13 @@ LUAI_FUNC int glm_trybinTM  (lua_State *L, const TValue *p1, const TValue *p2, S
 /// Helper function for generalized matrix int-access.
 /// </summary>
 static LUA_INLINE int matgeti (const TValue *obj, lua_Integer n, StkId res) {
-  const grit_length_t gidx = (grit_length_t)n;
-  const lua_Mat4 *m = mvalue_ref(obj);
-  if (l_likely(gidx >= 1 && gidx <= m->size)) {
-    switch (m->secondary) {
-      case 2: {
-        lua_Float4 f4 = luaMat_cast_m2(m->cols.m2[gidx - 1]);
-        setvvalue(s2v(res), f4, LUA_VVECTOR2);
-        return LUA_VVECTOR2;
-      }
-      case 3: {
-        lua_Float4 f4 = luaMat_cast_m3(m->cols.m3[gidx - 1]);
-        setvvalue(s2v(res), f4, LUA_VVECTOR3);
-        return LUA_VVECTOR3;
-      }
-      case 4: setvvalue(s2v(res), m->cols.m4[gidx - 1], LUA_VVECTOR4); return LUA_VVECTOR4;
+  const glm::length_t gidx = i_glmlen(n);
+  const glmMatrix &m = mvalue(obj);
+  if (l_likely(gidx >= 1 && gidx <= m.size)) {
+    switch (m.secondary) {
+      case 2: setvvalue(s2v(res), m.m42[gidx - 1], LUA_VVECTOR2); return LUA_VVECTOR2;
+      case 3: setvvalue(s2v(res), m.m43[gidx - 1], LUA_VVECTOR3); return LUA_VVECTOR3;
+      case 4: setvvalue(s2v(res), m.m44[gidx - 1], LUA_VVECTOR4); return LUA_VVECTOR4;
       default:
         break;
     }
