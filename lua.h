@@ -9,6 +9,10 @@
 #ifndef lua_h
 #define lua_h
 
+#ifndef CFX_SD
+#define CFX_SD
+#endif
+
 #include <stdarg.h>
 #include <stddef.h>
 
@@ -532,6 +536,12 @@ struct lua_Debug {
   /* private part */
   struct CallInfo *i_ci;  /* active function */
 };
+
+/*
+** cfxLua: internal dbg
+*/
+
+LUA_API int lua_toprotos (lua_State* L, int idx);
 
 /* }====================================================================== */
 

@@ -1634,4 +1634,38 @@ LUA_API void lua_upvaluejoin (lua_State *L, int fidx1, int n1,
   luaC_objbarrier(L, f1, *up1);
 }
 
+/*
+** cfxLua: scriptHandler
+*/
 
+/* get function functions, recursively */
+static int lua_toprotos_recursive (lua_State* L, Proto* p) {
+  int i, np = 1;
+  LClosure* ncl = NULL;
+
+  luaL_checkstack(L, 1 + p->sizep, "toprotos_recursive");
+  ncl = luaF_newLclosure(L, 0);
+  lua_lock(L);
+  setclLvalue2s(L, L->top, ncl);  /* anchor it */
+  api_incr_top(L);
+  lua_unlock(L);
+
+  ncl->p = p;
+  for (i = 0; i < p->sizep; i++)
+    np += lua_toprotos_recursive(L, p->p[i]);
+
+  return np;
+}
+
+LUA_API int lua_toprotos (lua_State* L, int idx) {
+  const TValue *o = index2value(L, idx);
+  if (ttisLclosure(o)) {
+    Proto* p = clLvalue(o)->p;
+    return lua_toprotos_recursive(L, p);
+  }
+  return 0;
+}
+
+LUA_API const TValue *lua_getvalue (lua_State* L, int idx) {
+  return index2value(L, idx);
+}
