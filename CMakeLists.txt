@@ -6,7 +6,9 @@ PROJECT( lua CXX )
 SET(CMAKE_CXX_STANDARD 11)
 SET(CMAKE_CXX_STANDARD_REQUIRED ON)
 SET(CXX_EXTENSIONS OFF)
-SET(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE) # CMake 3.9.0; support flto
+IF( _CMAKE_CXX_IPO_MAY_BE_SUPPORTED_BY_COMPILER )
+  SET(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE) # CMake 3.9.0; support flto
+ENDIF()
 
 INCLUDE(CheckCXXCompilerFlag)
 IF( CMAKE_CXX_COMPILER_ID MATCHES "Clang" )
@@ -96,21 +98,40 @@ IF( MSVC )
   ADD_COMPILE_DEFINITIONS(_CRT_SECURE_NO_DEPRECATE)
   ADD_COMPILE_DEFINITIONS(_CRT_NONSTDC_NO_DEPRECATE)
 
-  SET(LUA_CXX_FLAGS "${MSVC_OPT_FLAG} /Ob2 /Oi /Ot /GT /GF /GS- /MP /EHsc /GL")
+  SET(LUA_C_FLAGS "${MSVC_OPT_FLAG} /Ob2 /Oi /Ot /GT /GF /GS- /MP /EHsc /GL")
+  SET(LUA_REL_FLAGS "${LUA_REL_FLAGS} /GL")
+  SET(LUA_LINKFLAGS "${LUA_LINKFLAGS} /LTCG")
 
   # Visual Studio 2019 feature
   CHECK_CXX_COMPILER_FLAG("/Ob3" COMPILER_OPT_OB3)
   IF( COMPILER_OPT_OB3 )
-    STRING(REPLACE "/Ob2" "/Ob3" LUA_CXX_FLAGS "${LUA_CXX_FLAGS}")
+    STRING(REGEX REPLACE "[-/]Ob[1-4]" "" CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE}")
+    STRING(REGEX REPLACE "[-/]Ob[1-4]" "" CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
+    STRING(REPLACE "/Ob2" "/Ob3" LUA_C_FLAGS "${LUA_C_FLAGS}")
+
+    SET(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /Ob3")
+    SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /Ob3")
   ENDIF()
 
-  SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /Oy ${LUA_CXX_FLAGS} /DNDEBUG")
-  SET(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /Zi ${LUA_CXX_FLAGS} /DNDEBUG")
-  SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /Od /EHs /RTC1")
-  # SET(CMAKE_CXX_FLAGS_MINSIZEREL "${CMAKE_CXX_FLAGS_MINSIZEREL}")
+  SET(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} ${LUA_C_FLAGS} ${LUA_REL_FLAGS} /Oy")
+  SET(CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO} ${LUA_C_FLAGS} ${LUA_REL_FLAGS} /Zi")
+
+  SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} ${LUA_C_FLAGS} ${LUA_REL_FLAGS} /Oy")
+  SET(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} ${LUA_C_FLAGS} ${LUA_REL_FLAGS} /Zi")
+
+  SET(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} ${LUA_LINKFLAGS}")
+  SET(CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO "${CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO} ${LUA_LINKFLAGS}")
+
+  SET(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} ${LUA_LINKFLAGS}")
+  SET(CMAKE_SHARED_LINKER_FLAGS_RELWITHDEBINFO "${CMAKE_SHARED_LINKER_FLAGS_RELWITHDEBINFO} ${LUA_LINKFLAGS}")
+
+  SET(CMAKE_MODULE_LINKER_FLAGS_RELEASE "${CMAKE_MODULE_LINKER_FLAGS_RELEASE} ${LUA_LINKFLAGS}")
+  SET(CMAKE_MODULE_LINKER_FLAGS_RELWITHDEBINFO "${CMAKE_MODULE_LINKER_FLAGS_RELWITHDEBINFO} ${LUA_LINKFLAGS}")
 
   # W4 to turn compiler warnings all the way up...
+  STRING(REGEX REPLACE "[-/]W[1-4]" "" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
   STRING(REGEX REPLACE "[-/]W[1-4]" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+  SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /W3")
   SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W3")
 
 # Posix systems (including msys2/cygwin)
@@ -138,9 +159,15 @@ ELSE()
 
   # Compile everything, lglm.cpp, or nothing with common performance tweaks
   IF( LUA_NATIVE_ARCH )
-    ADD_COMPILE_OPTIONS(-fno-plt -fno-stack-protector -flto)
+    ADD_COMPILE_OPTIONS(-fno-stack-protector -flto)
+    IF (NOT CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
+        ADD_COMPILE_OPTIONS(-fno-plt)
+    ENDIF()
   ELSEIF( GLM_NATIVE_ARCH )
-    SET(glm_nativeFlags "${glm_nativeFlags} -fno-plt -fno-stack-protector -flto")
+    SET(glm_nativeFlags "${glm_nativeFlags} --fno-stack-protector -flto")
+    IF (NOT CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
+        SET(glm_nativeFlags "${glm_nativeFlags} -fno-plt")
+    ENDIF()
   ENDIF()
 
   # Compile everything, or lglm.cpp, or nothing with -march=native
@@ -168,15 +195,20 @@ ELSE()
   # Compiler options taken from Lua: lua/blob/master/makefile
   ADD_COMPILE_OPTIONS(
     -Wall -Wextra -Wshadow -Wsign-compare -Wundef -Wwrite-strings
-    -Wredundant-decls -Wdisabled-optimization -Wdouble-promotion -Wno-inline
-    -Wdouble-promotion -Wunused-parameter -Wno-comment -Wno-unused-function
-    -Wno-array-bounds -Wno-sign-conversion -Wstrict-overflow=2 -Wformat=2
-    -Wno-format-nonliteral
+    -Wdisabled-optimization -Wno-inline -Wunused-parameter -Wno-comment
+    -Wno-unused-function -Wno-array-bounds -Wno-sign-conversion -Wformat=2
     # -Werror
     # -Wconversion
     # -Wsign-conversion
     # -Wcast-qual
   )
+
+  IF (NOT CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
+    ADD_COMPILE_OPTIONS(
+        -Wredundant-decls -Wdouble-promotion -Wstrict-overflow=2
+        -Wno-format-nonliteral
+    )
+  ENDIF()
 
   IF( CMAKE_COMPILER_IS_CLANG )
     ADD_COMPILE_OPTIONS(-ferror-limit=5 -fno-common -Wno-deprecated
@@ -196,7 +228,7 @@ ELSE()
       #-Wno-nested-anon-types
       #-Wno-enum-enum-conversion
     )
-  ELSEIF( CMAKE_COMPILER_IS_GNUCC )
+  ELSEIF( CMAKE_COMPILER_IS_GNUCXX )
     ADD_COMPILE_OPTIONS(-fmax-errors=5 -Wduplicated-cond -Wrestrict -Wlogical-op
       -Wno-aggressive-loop-optimizations -Wno-ignored-qualifiers
       #-Wnull-dereference
@@ -403,9 +435,9 @@ OPTION(GLM_LUA_APICHECK
   keys/key-types. Otherwise, follow tables and set the result to nil" OFF
 )
 
-OPTION(GRIT_DEFER "Import func2close from ltests.h into the base library." ON)
-OPTION(GRIT_POWER_JOAAT "Enable compile time Jenkins' one-at-a-time hashing" ON)
 OPTION(GRIT_COMPAT_IPAIRS "Reintroduce compatibility for the ``__ipairs`` metamethod that was deprecated in 5.3 and removed in 5.4" ON)
+OPTION(GRIT_POWER_DEFER "Import func2close from ltests.h into the base library." ON)
+OPTION(GRIT_POWER_JOAAT "Enable compile time Jenkins' one-at-a-time hashing" ON)
 OPTION(GRIT_POWER_PRELOADLIBS "Allow the preloading of libraries via command line arguments." ON)
 OPTION(GRIT_POWER_COMPOUND "Add compound operators (+=, -=, *=, /=, <<=, >>=, &=, |=, and ^=) to the language." ON)
 OPTION(GRIT_POWER_INTABLE "Support for unpacking named values from tables using the in keyword" ON)
@@ -440,8 +472,8 @@ IF( GLM_LUA_APICHECK )
   ADD_COMPILE_DEFINITIONS(GLM_LUA_APICHECK)
 ENDIF()
 
-IF( GRIT_DEFER )
-  ADD_COMPILE_DEFINITIONS(GRIT_DEFER)
+IF( GRIT_POWER_DEFER )
+  ADD_COMPILE_DEFINITIONS(GRIT_POWER_DEFER)
 ENDIF()
 
 IF( GRIT_POWER_JOAAT )

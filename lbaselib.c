@@ -274,6 +274,11 @@ static int luaB_next (lua_State *L) {
 }
 
 
+static int pairscont (lua_State *L, int status, lua_KContext k) {
+  (void)L; (void)status; (void)k;  /* unused */
+  return 3;
+}
+
 static int luaB_pairs (lua_State *L) {
   luaL_checkany(L, 1);
   if (luaL_getmetafield(L, 1, "__pairs") == LUA_TNIL) {  /* no metamethod? */
@@ -283,13 +288,18 @@ static int luaB_pairs (lua_State *L) {
   }
   else {
     lua_pushvalue(L, 1);  /* argument 'self' to metamethod */
-    lua_call(L, 1, 3);  /* get 3 values from metamethod */
+    lua_callk(L, 1, 3, 0, pairscont);  /* get 3 values from metamethod */
   }
   return 3;
 }
 
 
 #if defined(GRIT_POWER_EACH)
+static int eachcont (lua_State *L, int status, lua_KContext k) {
+  (void)L; (void)status; (void)k;  /* unused */
+  return 4;
+}
+
 static int luaB_each (lua_State *L) {
   luaL_checkany(L, 1);
   if (luaL_getmetafield(L, 1, "__iter") == LUA_TNIL) {  /* no metamethod? */
@@ -302,7 +312,7 @@ static int luaB_each (lua_State *L) {
   }
 
   lua_pushvalue(L, 1);  /* argument 'self' to metamethod */
-  lua_call(L, 1, 4);  /* get 4 values from metamethod */
+  lua_callk(L, 1, 4, 0, eachcont);  /* get 4 values from metamethod */
   return 4;
 }
 #endif
@@ -556,7 +566,7 @@ static int luaB_tostring (lua_State *L) {
 }
 
 
-#if defined(GRIT_DEFER)
+#if defined(GRIT_POWER_DEFER)
 /* func2close */
 static int luaB_defer (lua_State *L) {
   luaL_checktype(L, 1, LUA_TFUNCTION);  /* check defer function */
@@ -628,7 +638,7 @@ static const luaL_Reg base_funcs[] = {
   {"tostring", luaB_tostring},
   {"type", luaB_type},
   {"xpcall", luaB_xpcall},
-#if defined(GRIT_DEFER)
+#if defined(GRIT_POWER_DEFER)
   {"defer", luaB_defer},
 #endif
 #if defined(GRIT_POWER_JOAAT)

@@ -1,8 +1,9 @@
 /*
 ** $Id: lglm.h $
-** Library & API definitions for LuaGLM. All functions defined in this header
-** are expected to have C++ linkage (or properties) and are to be isolated from
-** the Lua core
+** Library & API definitions for LuaGLM.
+**
+** All functions defined in this header are expected to have C++ linkage
+** and are to be isolated from the Lua core.
 **
 ** See Copyright Notice in lua.h
 */
@@ -291,7 +292,7 @@ struct glmMatrix {
 /// <summary>
 /// External userdata definition.
 ///
-/// TODO: The vector dimensionality can/should be packed into the type field
+/// @TODO: The vector dimensionality can/should be packed into the type field
 /// similar to how types & variants are define in Lua.
 /// </summary>
 struct glmUserdata {

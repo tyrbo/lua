@@ -1,149 +1,149 @@
-**Development Branch**: local working tree (RC).
-
 # LuaGLM
-A Lua 5.4.3 runtime providing vector, quaternion, and matrix data types with a (near-)complete binding to [GLM 0.9.9.9](https://github.com/g-truc/glm), a C++ mathematics library based on the [OpenGL Shading Language (GLSL)](https://www.opengl.org/registry/doc/GLSLangSpec.4.50.diff.pdf) specifications.
+A Lua 5.4.4 runtime providing vector, quaternion, and matrix data types with a (near-)complete binding to [GLM 0.9.9.9](https://github.com/g-truc/glm), a C++ mathematics library based on the [OpenGL Shading Language (GLSL)](https://www.opengl.org/registry/doc/GLSLangSpec.4.50.diff.pdf) specifications.
 
 > A significantly less efficient shared-library implementation, using tables and/or userdata instead of first-class types, for Lua5.1, Lua5.2, Lua5.3, Lua5.4, and [LuaJIT](https://github.com/LuaJIT/LuaJIT), can be found [TBD](https://github.com/gottfriedleibniz/...).
 
 ## Vectors/Quaternions
-Vectors and quaternions are basic types (following nil, boolean, number, string, function, userdata, thread, and tables) and are viewed as **immutable** tables of floats that are accessible by keys `1, 2, 3, 4`, `x, y, z, w`, and `r, g, b, a`:
+Vectors and quaternions are basic types (following nil, boolean, number, string, function, userdata, thread, and tables) and are viewed (syntactically and semantically) as **immutable** tables of floats that are accessible by keys `1, 2, 3, 4`, `x, y, z, w`, and `r, g, b, a`:
 ```lua
--- Generic vector constructor;
+-- Generic vector constructor
 > v = vec(math.pi, math.exp(1), (1 + math.sqrt(5)) / 2)
 
--- Vector constructor with explicit length;
+-- Vector constructor with explicit length
 > v3 = vec3(math.pi, math.exp(1), (1 + math.sqrt(5)) / 2)
 
--- Access the vectors fields;
+-- Access the vectors fields
 > v[3] + v.z
 3.2360680103302
 
--- Vector swizzling;
+-- Vector swizzling
 > v.xyzx
 vec4(3.141593, 2.718282, 1.618034, 3.141593)
 
 -- vectors and quaternions have an explicit type string even though they are
--- internally represented by the same LUA_TVECTOR tag (grit-lua compatbility);
+-- internally represented by the same LUA_TVECTOR tag (grit-lua compatbility)
 > print(type(v), type(quat(1,0,0,0)))
 vector3 quat
 
--- Test vectors for equality;
+-- Test vectors for equality
 > v == v3
 true
 
--- Arithmetic operators on vector types;
+-- Arithmetic operators on vector types
 > ((v + v3) * v) - v3
 vec3(16.597618, 12.059830, 3.618034)
 
--- The length operator returns the magnitude of the vector;
+-- The length operator returns the magnitude of the vector
 > #v
 4.4583287239075
 
--- Vector dimensionality;
+-- Vector dimensionality
 > v.n
 3
 
--- Iterate over each component with 'pairs';
+-- Iterate over each component with 'pairs'
 > for k,v in pairs(v3) do print(k,v) end
 x       3.1415927410126
 y       2.7182817459106
 z       1.6180340051651
 
--- Create a quaternion by rotating an axis by 35 degrees;
+-- Create a quaternion by rotating an axis by 35 degrees
 > quat(35.0, vec(1,0,0))
 quat(0.953717, {0.300706, 0.000000, 0.000000})
 
--- Multiply a direction vector by the quaternion;
+-- Multiply a direction vector by the quaternion
 > quat(35.0, vec(1,0,0)) * norm(vec(1,1,1))
 vec3(0.577350, 0.141783, 0.804092)
 
--- Use vectors as table keys.
+-- Use vectors as table keys
 > t = { }
 > t[v // 1.0] = "Hello, World!"
 > t[v // 1.0]
 Hello, World!
 ```
 
-When vectors/quaternions are accessed by other values some additional rules exist prior to a `__index` metamethod lookup:
-1. If the length of a string key is less than or equal to four characters, it is first passed through a swizzling filter, e.g., `v.zyx == vec3(v.z, v.y, v.x)`, returning a vector if all characters are valid fields;
-1. For quaternions, the `angle` and `axis` strings are reserved for the angle (in degrees) and normalized axis of rotation (grit-lua compatibility);
-1. The dimensionality of a vector can be accessed by the `n` and `dim` strings as the length operator returns the vector magnitude (grit-lua compatibility).
+When vectors/quaternions are accessed by other values/types some additional rules exist prior to a `__index` metamethod lookup:
+1. If a string key has less-than-or-equal-to four characters it is first passed through a swizzling filter. Returning a vector if all characters are valid fields, e.g., `v.zyx == vec3(v.z, v.y, v.x)`.
+1. The `angle` and `axis` strings are reserved for the angle (in degrees) and normalized axis of rotation for quaternion types (grit-lua compatibility).
+1. The dimensionality of a vector/quaternion can be accessed by the `n` and `dim` strings as the length operator returns the vector magnitude (grit-lua compatibility).
 
-Vector and quaternion types do not maintain an explicit metatable reference. The Lua functions `getmetatable` and `debug.setmetatable`, and C API functions `lua_setmetatable` and `lua_getmetatable` can be used to define explicit metatables for these types. The binding library (see **Building**) has the option to override the metatables for vector and matrix types when loaded.
+Vector and quaternion types do not maintain an explicit metatable reference. The Lua functions `getmetatable` and `debug.setmetatable` and C API functions `lua_setmetatable` and `lua_getmetatable` can be used to define explicit metatables for these types. The binding library (see **Building**) has the option to override the metatables for vector and matrix types when loaded.
 
 #### C API
-Vector and quaternions values are represented by the `LUA_TVECTOR` tag. They are primitive types (immutable) and use a struct of floats to represent each component. On an API level, vectors and quaternions are effectively tables and accessing their values can be done using the same Lua API functions:
-- [`lua_rawget`](https://www.lua.org/manual/5.4/manual.html#lua_rawget);
-- [`lua_rawgeti`](https://www.lua.org/manual/5.4/manual.html#lua_rawgeti);
-- [`lua_geti`](https://www.lua.org/manual/5.4/manual.html#lua_geti);
-- [`lua_getfield`](https://www.lua.org/manual/5.4/manual.html#lua_getfield);
-- [`lua_rawlen`](https://www.lua.org/manual/5.4/manual.html#lua_rawlen): Returns the dimensionality of the vector;
+Vector and quaternions values are represented by the `LUA_TVECTOR` tag and is internally represented using a struct of floats. On an API level, vectors and quaternions are effectively tables and accessing their values can be done using the same C API functions:
+- [`lua_rawget`](https://www.lua.org/manual/5.4/manual.html#lua_rawget)
+- [`lua_rawgeti`](https://www.lua.org/manual/5.4/manual.html#lua_rawgeti)
+- [`lua_geti`](https://www.lua.org/manual/5.4/manual.html#lua_geti)
+- [`lua_getfield`](https://www.lua.org/manual/5.4/manual.html#lua_getfield)
+- [`lua_rawlen`](https://www.lua.org/manual/5.4/manual.html#lua_rawlen): Returns the dimensionality of the vector.
 - [`lua_len`](https://www.lua.org/manual/5.4/manual.html#lua_len): Pushes the magnitude of the vector at the given index onto the stack (grit-lua compatibility).
+- [`lua_next`](https://www.lua.org/manual/5.4/manual.html#lua_next)
 
-See [lglm.hpp](lglm.hpp), the external header for interfacing with ``glm`` defined structures within Lua. The deprecated grit-lua API can be referenced by [lgrit_lib.h](lgrit_lib.h).
+See [lglm.hpp](lglm.hpp) the external header for interfacing with ``glm`` defined structures within Lua. The deprecated grit-lua API can still be referenced by [lgrit_lib.h](lgrit_lib.h).
 
 ## Matrices
-Matrices are another of basic type and represent **mutable** collections of **column**(-major) vectors that are only accessible by keys `1, 2, 3, 4`. They are **collectible** objects and beholden to the garbage collector.
+Matrices are another added type and represent **mutable** collections of **column**(-major) vectors that are accessible by keys `1, 2, 3, 4`. They are **collectible** objects and beholden to the garbage collector.
 
 ```lua
--- Create a matrix;
+-- Create a matrix
 > m = mat(vec(1.0, 0.0, 0.0), vec(0.0, 0.819152, 0.573576), vec(0.0, -0.573576, 0.819152))
 
--- matrices are basic types;
+-- matrices are a basic type
 > type(m)
 matrix
 
--- tostring for matrix and vector types invokes glm::to_string;
+-- tostring for matrix and vector types invokes glm::to_string
 > tostring(m)
 mat3x3((1.000000, 0.000000, 0.000000), (0.000000, 0.819152, 0.573576), (0.000000, -0.573576, 0.819152))
 
--- The length operator corresponds to the number of column vectors;
+-- The length operator corresponds to the number of column vectors
 > #m
 3
 
--- Access a column component;
+-- Access a column component
 > m[2]
 vec3(0.000000, 0.819152, 0.573576)
 
--- Iterate over each matrix component;
+-- Iterate over each matrix component
 > for k,v in pairs(m) do print(k, v) end
 1       vec3(1.000000, 0.000000, 0.000000)
 2       vec3(0.000000, 0.819152, 0.573576)
 3       vec3(0.000000, -0.573576, 0.819152)
 
--- Multiply a vector by the given matrix;
+-- Multiply a vector by the given matrix
 > m * vec(0,1,0)
 vec3(0.000000, 0.819152, 0.573576)
 
--- Append a column vector;
+-- Append a column vector
 > m[4] = vec3(0)
 > m
 mat4x3((1.000000, 0.000000, 0.000000), (0.000000, 0.819152, 0.573576), (0.000000, -0.573576, 0.819152), (0.000000, 0.000000, 0.000000))
 
--- Remove column vectors. Note only m[#m] can be removed at a time;
+-- Remove column vectors. Note only m[#m] can be removed at a time
 > m[3],m[4] = nil,nil
 > m
 mat2x3((1.000000, 2.000000, 3.000000), (4.000000, 5.000000, 6.000000))
 ```
 
 #### C API
-Matrix objects are represented by the `LUA_TMATRIX` tag. On an API level, they are effectively tables (more specifically arrays) and accessing/modifying their components can be done with same Lua API functions:
-- [`lua_gettable`](https://www.lua.org/manual/5.4/manual.html#lua_gettable), [`lua_settable`](https://www.lua.org/manual/5.4/manual.html#lua_settable);
-- [`lua_geti`](https://www.lua.org/manual/5.4/manual.html#lua_geti), [`lua_seti`](https://www.lua.org/manual/5.4/manual.html#lua_seti);
-- [`lua_rawget`](https://www.lua.org/manual/5.4/manual.html#lua_rawget), [`lua_rawset`](https://www.lua.org/manual/5.4/manual.html#lua_rawset);
+Matrix objects are represented by the `LUA_TMATRIX` tag. On an API level, they are effectively tables (more specifically arrays) and accessing/modifying their components can be done with same C API functions:
+- [`lua_gettable`](https://www.lua.org/manual/5.4/manual.html#lua_gettable), [`lua_settable`](https://www.lua.org/manual/5.4/manual.html#lua_settable)
+- [`lua_geti`](https://www.lua.org/manual/5.4/manual.html#lua_geti), [`lua_seti`](https://www.lua.org/manual/5.4/manual.html#lua_seti)
+- [`lua_rawget`](https://www.lua.org/manual/5.4/manual.html#lua_rawget), [`lua_rawset`](https://www.lua.org/manual/5.4/manual.html#lua_rawset)
 - [`lua_rawgeti`](https://www.lua.org/manual/5.4/manual.html#lua_rawgeti), [`lua_rawseti`](https://www.lua.org/manual/5.4/manual.html#lua_rawseti).
-- [`lua_rawlen`](https://www.lua.org/manual/5.4/manual.html#lua_rawlen), [`lua_len`](https://www.lua.org/manual/5.4/manual.html#lua_len): Returns the dimensionality (number of columns) of the matrix;
+- [`lua_rawlen`](https://www.lua.org/manual/5.4/manual.html#lua_rawlen), [`lua_len`](https://www.lua.org/manual/5.4/manual.html#lua_len): Returns the dimensionality (number of columns) of the matrix.
+- [`lua_next`](https://www.lua.org/manual/5.4/manual.html#lua_next)
 
-See [lglm.hpp](...), the external header for interfacing with ``glm`` defined matrices within Lua.
+Following vectors, matrix types do not maintain an explicit metatable reference. See [lglm.hpp](lglm.hpp) the external header for interfacing with ``glm`` defined matrices within Lua.
 
 ## Binding Library
-Each function within the [GLM API](https://glm.g-truc.net/0.9.9/api/modules.html) has an equivalent Lua library function of the same name whose template arguments are resolved at call-time when parsing values from the Lua stack. For example,
+Each function within the [GLM API](https://glm.g-truc.net/0.9.9/api/modules.html) has an equivalent Lua [library function](libs/glm-binding) of the same name whose template arguments are resolved at call-time when parsing values from the Lua stack. For example:
 
 ```lua
--- Creates a matrix with four vector components (recall GLM is column-major);
+-- Creates a matrix with four vector components (recall GLM is column-major)
 > m = glm.axisAngleMatrix(vec3(1.0, 0.0, 0.0), glm.radians(35.0))
 
--- Iterate over each matrix component;
+-- Iterate over each matrix component
 > for k,v in pairs(m) do print(k, v) end
 1       vec4(1.000000, 0.000000, 0.000000, 0.000000)
 2       vec4(0.000000, 0.819152, 0.573576, 0.000000)
@@ -151,19 +151,19 @@ Each function within the [GLM API](https://glm.g-truc.net/0.9.9/api/modules.html
 4       vec4(0.000000, 0.000000, 0.000000, 1.000000)
 
 -- Note: getmetatable(m).__index == glm
---
--- Convert the matrix to a quaternion;
+
+-- Convert the matrix to a quaternion
 > m:toQuat()
 quat(0.953717, {0.300706, 0.000000, 0.000000})
 
--- Apply a rotation to the matrix (note, there are nine variations of glm::rotate);
+-- Apply a rotation to the matrix (note, there are nine variations of glm::rotate)
 m2 = m:rotate(math.rad(35.0), vec3(1, 0, 0))
 
--- Extract XZY Angles;
+-- Extract XZY Angles
 > glm.degrees(vec(m2:extractEulerAngleXZY()))
 vec3(70.000000, -0.000000, 0.000000)
 
--- spherical linear interpolation of the matrices as quaternions;
+-- spherical linear interpolation of the matrices as quaternions
 > slerp(m:toQuat(), m2:toQuat(), 2/glm.pi)
 quat(0.877641, {0.479318, 0.000000, 0.000000})
 
@@ -176,8 +176,8 @@ quat(0.877641, {0.479318, 0.000000, 0.000000})
 
 The binding library also extends GLM to:
 
-1. Add vector support for all functions declared in [cmath(C99/C++11)](http://www.cplusplus.com/reference/cmath/);
-1. Alias (e.g., length vs. magnitude), emulate, and port useful and common functions from other popular vector-math libraries (listed in **Sources & Acknowledgments**);
+1. Add vector support for all functions declared in [cmath(C99/C++11)](http://www.cplusplus.com/reference/cmath/).
+1. Alias (e.g., length vs. magnitude), emulate, and port useful and common functions from other popular vector-math libraries (listed in **Sources & Acknowledgments**).
 1. Be a complete superset of Lua's [lmathlib](https://www.lua.org/manual/5.4/manual.html#6.7). Meaning `_G.math` can be replaced by the binding library without compatibility concerns. Note, `math.random` and `math.randomseed` are copied from `lmathlib` when the library is loaded rather than extending/maintaining another pseudorandom-state (see `glm/gtc/random.hpp`).
 
 See [EXTENDED.md](EXTENDED.md) for a list of additional functions.
@@ -185,12 +185,12 @@ See [EXTENDED.md](EXTENDED.md) for a list of additional functions.
 #### Casting Rules
 As vector/quaternion types are represented by float-point values, some additional type-inferencing rules are required when casting values to and from floating point values (see sections [4.6-4.9] in your favorite `ISO/IEC 14882` document):
 
-1. A `glm::vec<1, ...>` structure is represented by `lua_Integer`, `lua_Number`, or `bool` Lua value and all `glm::vec<1, ...>` bindings are templated to those Lua types;
-1. All other `glm::vec` structures are float-casted (and/or bound to float-templated functions). Consequently, bitfield and integer operations, e.g., [packUnorm](http://glm.g-truc.net/0.9.9/api/a00716.html#gaccd3f27e6ba5163eb7aa9bc8ff96251a) and [floatBitsToInt](http://glm.g-truc.net/0.9.9/api/a00662.html#ga99f7d62f78ac5ea3b49bae715c9488ed), are considered unsafe when operating on multi-dimensional vectors (consider inexact IEEE754);
+1. A `glm::vec<1, ...>` structure is represented by `lua_Integer`, `lua_Number`, or `bool` Lua value and all `glm::vec<1, ...>` bindings are templated to those Lua types.
+1. All other `glm::vec` structures are float-casted (and/or bound to float-templated functions). Consequently, bitfield and integer operations, e.g., [packUnorm](http://glm.g-truc.net/0.9.9/api/a00716.html#gaccd3f27e6ba5163eb7aa9bc8ff96251a) and [floatBitsToInt](http://glm.g-truc.net/0.9.9/api/a00662.html#ga99f7d62f78ac5ea3b49bae715c9488ed), are considered unsafe when operating on multi-dimensional vectors (consider inexact IEEE754).
 1. Matrices are represented by a collection of column-vectors that abide by the vector rules above. Prior to GLM 0.9.9.9, there has been little practical use for integer/bool templated matrices given the lack of an API.
 
 #### Geometry API
-Many of the geometric structures developed for [MathGeoLib](https://github.com/juj/MathGeoLib/tree/master/src/Geometry) have been ported to [GLM](https://github.com/g-truc/glm). In turn these structures bound to `lua-glm`, providing functional libraries for **AABB**, **Line**, **Ray**, **Segment**, **Sphere**, **Plane**, and **Polygon**. Each geometrical structure is stored as a sub-library within the binding library. For example:
+Many of the geometric structures developed for [MathGeoLib](https://github.com/juj/MathGeoLib/tree/master/src/Geometry) have been ported to [GLM](https://github.com/g-truc/glm). In turn these structures are bound to `lua-glm`, providing functional libraries for **AABB**, **Line**, **Ray**, **Segment**, **Sphere**, **Plane**, and **Polygon**. Each geometrical structure is stored as a sub-library within the base binding library. For example:
 
 ```lua
 -- AABB/Line Raycast
@@ -210,7 +210,7 @@ end
 rayOrigin,rayDirection = glm.ray.operator_mul(m, rayOrigin, rayDirection)
 ```
 
-Polygons -- sequences of coplanar points -- are represented by a full userdata type:
+Polygons (sequences of coplanar points) are represented by a full userdata type:
 
 ```lua
 p = glm.polygon.new({
@@ -303,10 +303,10 @@ String literals wrapped in back-ticks are Jenkins' one-at-a-time hashed when par
 1395890823
 ```
 
-For run-time hashing, the `joaat` function is included in the base library:
+For runtime hashing, the `joaat` function is included in the base library:
 
 ```lua
--- joaat(input, [, ignore_casing]): Compute the Jenkins hash of the input string.
+-- joaat(input [, ignore_casing]): Compute the Jenkins hash of the input string.
 -- If 'ignore_casing' is true, the byte data is hashed as is. Otherwise, each
 -- ASCII character is tolower'd prior to hashing.
 > joaat("Hello, World!")
@@ -351,10 +351,10 @@ which defaults to a ``pairs`` implementation that supports a fourth return varia
 Introduce a `LUA_TSTRING` variant that is effectively a `LUA_VLNGSTR` but without the hash caching mechanism. Values of this variant are stored in tables by reference.
 
 ```lua
--- Create a string blob of specified length;
+-- Create a string blob of specified length
 blob = string.blob(512)
 
--- Create a blob variant of another string;
+-- Create a blob variant of another string
 blob = string.blob(string.rep('\0', 80))
 
 -- Returns a string blob containing the values v1, v2, etc. serialized in binary
@@ -386,12 +386,12 @@ const char *lua_pushblob(lua_State *L, size_t len);
 const char *lua_tostringblob(lua_State *L, int idx, size_t *len);
 ```
 
-A [DataView](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/DataView) API that interfaces with Luas built in facilities, e.g., string.pack, string.unpack, and table.concat, is located in `libs/scripts/examples`.
+A [DataView](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/DataView) API that interfaces with Lua's built in facilities, e.g., string.pack, string.unpack, and table.concat, is located [here](libs/scripts/examples/dataview.lua).
 
-The current solution simply allows byte data to still be beholden to the garbage collector while not requiring the allocation of intermediate data when going to and from the Lua API.
+The intent is to allow byte data to still be beholden to the garbage collector while not requiring the allocation of intermediate data when going to and from the Lua API (unsafe caveats apply).
 
 #### Extended API:
-Expose ``lua_createtable`` and API functions common to other Lua runtimes.
+Expose ``lua_createtable`` and API functions common to other custom Lua runtimes.
 
 ```lua
 -- Creates a new empty table
@@ -473,7 +473,8 @@ A CMake project that builds the stand-alone interpreter (`lua`), a compiler (`lu
 # Create build directory
 └> mkdir -p build ; cd build
 
-# Compile with icpx: -DCMAKE_CXX_COMPILER=/opt/intel/[...]/bin/icpx
+# Compile with icc: -DCMAKE_C_COMPILER=icc -DCMAKE_CXX_COMPILER=icpc
+# Ensure LD_LIBRARY_PATH contains a reference to: libimf.a
 └> cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release ..
 
 # Build
@@ -486,20 +487,22 @@ Note: for msbuild environments, it's preferred to the the LLVM toolset (`-T llvm
 Note, not all Lua-specific options are listed.
 
 - **Compilation**:
-  - **ONE\_LUA**: Compile Lua core, libraries, and interpreter as a single file;
-  - **LUA\_NATIVE\_ARCH**: Enable compiler optimizations for the native processor architecture;
-  - **LUA\_NO\_DUMP**: Disable the dump module (dumping Lua functions as precompiled chunks);
-  - **LUA\_NO\_BYTECODE**: Disables the usage of lua_load with binary chunks;
+  - **ONE\_LUA**: Compile Lua core, libraries, and interpreter as a single file.
+  - **LUA\_NATIVE\_ARCH**: Enable compiler optimizations for the native processor architecture.
+  - **LUA\_NO\_DUMP**: Disable the dump module (dumping Lua functions as precompiled chunks).
+  - **LUA\_NO\_BYTECODE**: Disables the usage of lua_load with binary chunks.
   - **LUA\_NO\_PARSER**: Compile the Lua core so it does not contain the parsing modules (lcode, llex, lparser). Only binary files and strings, precompiled with luac, can be loaded.
 - **Testing**:
-  - **LUA\_INCLUDE\_TEST**: Include ltests.h and testing modules (this option enables many of the following flags by default);
-  - **LUAI\_ASSERT**: Turn on all assertions inside Lua;
-  - **LUA\_USE\_APICHECK**: Turns on several consistency checks on the C API;
-  - **HARDSTACKTESTS**: Force a reallocation of the stack at every point where the stack can be reallocated;
-  - **HARDMEMTESTS**: Force a full collection at all points where the collector can run;
-  - **EMERGENCYGCTESTS**: Force an emergency collection at every single allocation;
+  - **LUA\_INCLUDE\_TEST**: Include ltests.h and testing modules. Note this option enables many of the following flags by default.
+  - **LUAI\_ASSERT**: Turn on all assertions inside Lua.
+  - **LUA\_USE\_APICHECK**: Turns on several consistency checks on the C API.
+  - **HARDSTACKTESTS**: Force a reallocation of the stack at every point where the stack can be reallocated.
+  - **HARDMEMTESTS**: Force a full collection at all points where the collector can run.
+  - **EMERGENCYGCTESTS**: Force an emergency collection at every single allocation.
   - **EXTERNMEMCHECK**: Removes internal consistency checking of blocks being deallocated.
 - **Power Patches**: See Lua Power Patches section.
+  - **GRIT\_COMPAT\_IPAIRS**
+  - **GRIT\_POWER\_DEFER**
   - **GRIT\_POWER\_COMPOUND**
   - **GRIT\_POWER\_SAFENAV**
   - **GRIT\_POWER\_INTABLE**
@@ -507,8 +510,6 @@ Note, not all Lua-specific options are listed.
   - **GRIT\_POWER\_CCOMMENT**
   - **GRIT\_POWER\_ANONDO**
   - **GRIT\_POWER\_JOAAT**
-  - **GRIT\_COMPAT\_IPAIRS**
-  - **GRIT\_DEFER**
   - **GRIT\_POWER\_EACH**
   - **GRIT\_POWER\_BLOB**
   - **GRIT\_POWER\_WOW**
@@ -516,31 +517,31 @@ Note, not all Lua-specific options are listed.
   - **GRIT\_POWER\_READLINE\_HISTORY**
 
 #### GLM Preprocessor Configurations:
-- **GLM\_FORCE\_MESSAGES**: Platform auto detection and default configuration;
-- **GLM\_FORCE\_INLINE**: Force inline;
-- **GLM\_FORCE\_ALIGNED\_GENTYPES**: Force GLM to enable aligned types;
-- **GLM\_FORCE\_DEFAULT\_ALIGNED\_GENTYPES**: Force GLM to use aligned types by default;
-- **GLM\_FORCE\_INTRINSICS**: Using SIMD optimizations;
-- **GLM\_FORCE\_PRECISION\_**: Default precision;
-- **GLM\_FORCE\_SINGLE\_ONLY**: Removed explicit 64-bits floating point types;
-- **GLM\_FORCE\_XYZW\_ONLY**: Only exposes x, y, z and w components. Note: when enabled disables all **COLOR_SPACE** bindings;
-- **GLM\_FORCE\_LEFT\_HANDED**: Force left handed coordinate system;
-- **GLM\_FORCE\_DEPTH\_ZERO\_TO\_ONE**: Force the use of a clip space between 0 to 1;
-- **GLM\_FORCE\_SIZE\_T\_LENGTH**: Vector and matrix static size type;
-- **GLM\_FORCE\_UNRESTRICTED\_GENTYPE**: Removing genType restriction;
-- **GLM\_FORCE\_SILENT\_WARNINGS**: Silent C++ warnings from language extensions;
+- **GLM\_FORCE\_MESSAGES**: Platform auto detection and default configuration.
+- **GLM\_FORCE\_INLINE**: Force inline.
+- **GLM\_FORCE\_ALIGNED\_GENTYPES**: Force GLM to enable aligned types.
+- **GLM\_FORCE\_DEFAULT\_ALIGNED\_GENTYPES**: Force GLM to use aligned types by default.
+- **GLM\_FORCE\_INTRINSICS**: Using SIMD optimizations.
+- **GLM\_FORCE\_PRECISION\_**: Default precision.
+- **GLM\_FORCE\_SINGLE\_ONLY**: Removed explicit 64-bits floating point types.
+- **GLM\_FORCE\_XYZW\_ONLY**: Only exposes x, y, z and w components. Note: when enabled disables all **COLOR_SPACE** bindings.
+- **GLM\_FORCE\_LEFT\_HANDED**: Force left handed coordinate system.
+- **GLM\_FORCE\_DEPTH\_ZERO\_TO\_ONE**: Force the use of a clip space between 0 to 1.
+- **GLM\_FORCE\_SIZE\_T\_LENGTH**: Vector and matrix static size type.
+- **GLM\_FORCE\_UNRESTRICTED\_GENTYPE**: Removing genType restriction.
+- **GLM\_FORCE\_SILENT\_WARNINGS**: Silent C++ warnings from language extensions.
 - **GLM\_FORCE\_QUAT\_DATA\_WXYZ**: Force GLM to store quat data as w,x,y,z instead of x,y,z,w.
 
-For all GLM preprocessor flags, reference the [GLM manual](https://github.com/g-truc/glm/blob/master/manual.md#section2).
+For all GLM preprocessor flags, see the [GLM manual](https://github.com/g-truc/glm/blob/master/manual.md#section2).
 
 #### Added GLM Preprocessor Configurations:
-- **GLM\_FAST\_MATH**: Enable fast math optimizations (see `-ffast-math` caveats);
-- **GLM\_FORCE\_Z\_UP**: Unit "up" vector is along the Z-axis (Y-axis otherwise);
-- **GLM\_INCLUDE\_ALL**: Create bindings for all declared GLM headers. To create module-only, extension-only, or header-only bindings see **EXTENDED.md** for a list of all headers;
-- **GLM\_GEOM\_EXTENSIONS**: Include support for geometric structures;
-- **LUA\_GLM\_ALIASES**: Create aliases for common (alternate) names when registering the library;
-- **LUA\_GLM\_REPLACE\_MATH**: Replace the global math table with the glm binding library on loading;
-- **LUA\_GLM\_DRIFT**: Implicitly normalize all direction vector parameters (experiment to avoid floating-point drift);
+- **GLM\_FAST\_MATH**: Enable fast math optimizations (see `-ffast-math` caveats).
+- **GLM\_FORCE\_Z\_UP**: Unit "up" vector is along the Z-axis (Y-axis otherwise).
+- **GLM\_INCLUDE\_ALL**: Create bindings for all declared GLM headers. To create module-only, extension-only, or header-only bindings see **EXTENDED.md** for a list of all headers.
+- **GLM\_GEOM\_EXTENSIONS**: Include support for geometric structures.
+- **LUA\_GLM\_ALIASES**: Create aliases for common (alternate) names when registering the library.
+- **LUA\_GLM\_REPLACE\_MATH**: Replace the global math table with the glm binding library on loading.
+- **LUA\_GLM\_DRIFT**: Implicitly normalize all direction vector parameters (experiment to avoid floating-point drift).
 - **LUA\_GLM\_RECYCLE**: Treat all trailing and unused values on the Lua stack (but passed as parameters to the `CClosure`) as a 'cache' of recyclable structures.
     ```lua
     -- Some shared matrix
@@ -555,15 +556,15 @@ For all GLM preprocessor flags, reference the [GLM manual](https://github.com/g-
     ```
 
 ## Developer Notes:
+See [libs/scripts](libs/scripts) for a collection of example/test scripts using these added features.
 
 #### Planned Features:
-1. One downside to vectors/quaternions being an explicit `Value` is that they increase the minimum `Value` to at least 16 bytes. Given that types in Lua are fairly transparent, it may be beneficial to introduce, or at least experiment with, a compile-time option to make vector/quaternion types collectible;
-1. Support for integer vectors/matrices. Either by introducing an additional type, e.g., `LUA_TVECTORI`, or splitting the vector tag `LUA_TVECTOR` into `LUA_TVECTOR2`, `LUA_TVECTOR3`, `LUA_TVECTOR4`, and `LUA_TQUAT` and use variant bits for the primitive type;
-1. A LINQ-style library that takes advantage of `__iter/__pairs`;
-1. Replace `glm/gtc/random.{inl,hpp}` with a variant that takes advantage of CXX11's [Pseudo-random number generation](https://en.cppreference.com/w/cpp/numeric/random) facilities. Or one that unifies this API and `math.random()`;
-1. Basic support for triangles and meshes, retrofit current spatial indexing structures for triangles, and consider BSPs;
-1. Initial support for frustums (both orthographic and perspective) and OBBs, or, at minimum, the more computationally complex parts of these structures;
-1. UNARY\_EACH: Allow some binding functions to be independently applied to each value or structure on the call stack. If disabled, only operate on the minimum number of required objects (following lmathlib). For example:
+1. One downside to vectors/quaternions being an explicit `Value` is that they increase the minimum Value size to at least 16 bytes. Given that types in Lua are fairly transparent, it may be beneficial to introduce, or at least experiment with, a compile-time option to make vector/quaternion types collectible.
+1. Support for integer vectors/matrices. Either by introducing an additional type, e.g., `LUA_TVECTORI`, or splitting the vector tag `LUA_TVECTOR` into `LUA_TVECTOR2`, `LUA_TVECTOR3`, `LUA_TVECTOR4`, and `LUA_TQUAT` and use variant bits for the primitive type.
+1. Replace `glm/gtc/random.{inl,hpp}` with a variant that takes advantage of CXX11's [Pseudo-random number generation](https://en.cppreference.com/w/cpp/numeric/random) facilities (and unify it with `math.random`).
+1. Basic support for triangles and meshes, retrofit current spatial indexing structures for triangles, and consider BSPs.
+1. Initial support for frustums (both orthographic and perspective) and OBBs, or, at minimum, the more computationally complex parts of these structures.
+1. Allow some binding functions to be independently applied to each value or structure on the call stack. If disabled, only operate on the minimum number of required objects (following lmathlib). For example:
     ``` lua
     -- lmathlib
     > math.rad(35, 35)
@@ -579,11 +580,11 @@ For all GLM preprocessor flags, reference the [GLM manual](https://github.com/g-
     ```
 
 #### Tweaks:
-1. Fix/improve MSVC portions of CMakeLists;
-1. `glmMat_set` support for tables, e.g., `mat[i] = { ... }`, by using `glmH_tovector`;
-1. Improve support for `glm::mat3x4` and `glm::mat4x3`;
-1. Support for two-dimensional geometrical structures (AABB2D, LineSegment2D, Circle2D, etc);
-1. `glm-binding/geom`: SIMD support (or at the very least, the most commonly used functions);
+1. Fix/improve MSVC portions of CMakeLists.
+1. `glmMat_set` support for tables, e.g., `mat[i] = { ... }`, by using `glmH_tovector`.
+1. Improve support for `glm::mat3x4` and `glm::mat4x3`.
+1. Support for two-dimensional geometrical structures (AABB2D, LineSegment2D, Circle2D, etc).
+1. [geom](libs/glm-binding/geom): SIMD support (at the very least for the most commonly used functions).
 
 ## Benchmarking
 **TODO**: Finish comparisons to...
@@ -593,9 +594,10 @@ For all GLM preprocessor flags, reference the [GLM manual](https://github.com/g-
 - [Unity.Mathematics](https://github.com/Unity-Technologies/Unity.Mathematics)
 
 ## Sources & Acknowledgments:
-1. [grit-lua](https://github.com/grit-engine/grit-lua): Original implementation (and inspiration);
-1. [MathGeoLib](https://github.com/juj/MathGeoLib/): Geometry API, (`libs/glm-binding/geom/`), is distributed under [Apache License](http://www.apache.org/licenses/LICENSE-2.0.html);
-1. [SharpDX](https://github.com/sharpdx/SharpDX): Reference for Extended API (aliases);
+1. [grit-lua](https://github.com/grit-engine/grit-lua): Original implementation and inspiration.
+1. [MathGeoLib](https://github.com/juj/MathGeoLib/): [Geometry API](libs/glm-binding/geom) is distributed under [Apache License](http://www.apache.org/licenses/LICENSE-2.0.html).
+1. [SharpDX](https://github.com/sharpdx/SharpDX): Reference for Extended API (aliases).
+1. [Godot Engine](https://docs.godotengine.org/en/stable/classes/): Reference for Extended API (aliases).
 1. [Unity](https://docs.unity3d.com/ScriptReference/UnityEngine.CoreModule.html): Reference for Extended API (aliases and emulation of some [mathf](https://docs.unity3d.com/ScriptReference/Mathf.html) functions).
 
 ## License

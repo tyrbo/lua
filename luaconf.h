@@ -845,7 +845,7 @@
 
 /*
 ** {==================================================================
-** (DEPRECATED) gritLua vector API
+** @DEPRECATED gritLua vector API
 **
 ** @NOTE: GRIT_LONG_FLOAT has been deprecated and replaced by GLM_LUA_NUMBER_TYPE
 **
@@ -888,7 +888,7 @@ typedef LUA_VEC_NUMBER lua_VecF;
 /*
 ** gritLua: vector and quat extension
 **
-*** @NOTE: This structure is intended to be a byte-wise equivalent to glmVector
+** @NOTE: This structure is intended to be a byte-wise equivalent to glmVector
 **    within lglm.hpp but without the glm dependencies.
 */
 typedef struct lua_Float4 { lua_VecF x, y, z, w; } lua_Float4;
