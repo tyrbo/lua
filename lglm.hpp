@@ -24,10 +24,10 @@
 ** primitive to each vector/quaternion is float. This increases the minimum size
 ** to a Value/TaggedValue to 16-bytes (or 4 x float).
 **
-** By enabling "GLM_USE_LUA_TYPE", the primitive type of each vector becomes
-** lua_Number, the default Lua floating point type.
+** By enabling "LUA_GLM_NUMBER_TYPE", the primitive type of each vector becomes
+** lua_Number.
 */
-#if defined(GLM_LUA_NUMBER_TYPE) && LUA_FLOAT_TYPE != LUA_FLOAT_LONGDOUBLE
+#if defined(LUA_GLM_NUMBER_TYPE) && LUA_FLOAT_TYPE != LUA_FLOAT_LONGDOUBLE
   #define GLM_FLOAT_TYPE LUA_NUMBER
   #define GLM_INT_TYPE LUA_INTEGER
 #else
@@ -71,7 +71,7 @@ typedef GLM_INT_TYPE glm_Integer;
 #define cast_quat(Q, T) glm::qua<T>(static_cast<T>((Q).w), static_cast<T>((Q).x), static_cast<T>((Q).y), static_cast<T>((Q).z))
 
 /* @NOTE equal objects must have equal hashes; use with caution. */
-#if defined(GLM_LUA_EPS_EQUAL)
+#if defined(LUA_GLM_EPS_EQUAL)
   #define _glmeq(a, b) (glm::all(glm::equal((a), (b), glm::epsilon<glm_Float>())))
 #else
   #define _glmeq(a, b) ((a) == (b))
@@ -238,9 +238,7 @@ union glmVector {
 /// <summary>
 /// Internal matrix definition.
 /// </summary>
-struct glmMatrix {
-  glm::length_t size;
-  glm::length_t secondary;
+LUA_GLM_ALIGNED_TYPE(struct, glmMatrix) {
   union {
     glm::mat<2, 2, glm_Float> m22;
     glm::mat<2, 3, glm_Float> m23;
@@ -252,17 +250,19 @@ struct glmMatrix {
     glm::mat<4, 3, glm_Float> m43;
     glm::mat<4, 4, glm_Float> m44;
   };
+  glm::length_t size;
+  glm::length_t secondary;
 
   glmMatrix() GLM_DEFAULT_CTOR;
-  glmMatrix(const glm::mat<2, 2, glm_Float> &_m) : size(2), secondary(2), m22(_m) { }
-  glmMatrix(const glm::mat<2, 3, glm_Float> &_m) : size(2), secondary(3), m23(_m) { }
-  glmMatrix(const glm::mat<2, 4, glm_Float> &_m) : size(2), secondary(4), m24(_m) { }
-  glmMatrix(const glm::mat<3, 2, glm_Float> &_m) : size(3), secondary(2), m32(_m) { }
-  glmMatrix(const glm::mat<3, 3, glm_Float> &_m) : size(3), secondary(3), m33(_m) { }
-  glmMatrix(const glm::mat<3, 4, glm_Float> &_m) : size(3), secondary(4), m34(_m) { }
-  glmMatrix(const glm::mat<4, 2, glm_Float> &_m) : size(4), secondary(2), m42(_m) { }
-  glmMatrix(const glm::mat<4, 3, glm_Float> &_m) : size(4), secondary(3), m43(_m) { }
-  glmMatrix(const glm::mat<4, 4, glm_Float> &_m) : size(4), secondary(4), m44(_m) { }
+  glmMatrix(const glm::mat<2, 2, glm_Float> &_m) : m22(_m), size(2), secondary(2) { }
+  glmMatrix(const glm::mat<2, 3, glm_Float> &_m) : m23(_m), size(2), secondary(3) { }
+  glmMatrix(const glm::mat<2, 4, glm_Float> &_m) : m24(_m), size(2), secondary(4) { }
+  glmMatrix(const glm::mat<3, 2, glm_Float> &_m) : m32(_m), size(3), secondary(2) { }
+  glmMatrix(const glm::mat<3, 3, glm_Float> &_m) : m33(_m), size(3), secondary(3) { }
+  glmMatrix(const glm::mat<3, 4, glm_Float> &_m) : m34(_m), size(3), secondary(4) { }
+  glmMatrix(const glm::mat<4, 2, glm_Float> &_m) : m42(_m), size(4), secondary(2) { }
+  glmMatrix(const glm::mat<4, 3, glm_Float> &_m) : m43(_m), size(4), secondary(3) { }
+  glmMatrix(const glm::mat<4, 4, glm_Float> &_m) : m44(_m), size(4), secondary(4) { }
 
   // Assignment Operators
 
@@ -289,39 +289,6 @@ struct glmMatrix {
   inline int Get(glm::mat<4, 4, glm_Float> &_m) const { _m = m44; return 1; }
 };
 
-/// <summary>
-/// External userdata definition.
-///
-/// @TODO: The vector dimensionality can/should be packed into the type field
-/// similar to how types & variants are define in Lua.
-/// </summary>
-struct glmUserdata {
-  unsigned char type = 0;  // glm type identifier/variant identifier.
-  union {
-    struct {
-      glm::length_t size;
-      glmVector v;
-    } vec;
-    glmMatrix mat;
-  };
-
-  /// <summary>
-  /// Create a new matrix userdata of the specified type.
-  /// </summary>
-  glmUserdata(const glmMatrix &_m, unsigned char _t)
-    : type(_t), mat(_m) {
-  }
-
-  /// <summary>
-  /// Create a new vector userdata of the specified type.
-  /// </summary>
-  glmUserdata(const glmVector &_v, glm::length_t _s, unsigned char _t)
-    : type(_t), mat() {
-    vec.v = _v;
-    vec.size = _s;
-  }
-};
-
 /*
 ** Pushes a vector of dimensionality of 'd' represented by 'v' onto the stack.
 ** Returning one on success (i.e., valid dimension argument), zero otherwise.
@@ -338,7 +305,7 @@ LUA_API int glm_pushvec(lua_State *L, const glmVector &v, glm::length_t d);
 ** @NOTE This function is identical to glm_pushquat, but without the (implicit)
 **  conversion.
 */
-LUA_API int glm_pushquat_(lua_State *L, const glmVector &q);
+LUA_API int glm_pushvec_quat(lua_State *L, const glmVector &q);
 
 /*
 ** Creates a new Matrix object, represented by 'm', and places it onto the stack.
@@ -358,14 +325,39 @@ LUA_API int glm_pushmat(lua_State *L, const glmMatrix &m);
 */
 #if defined(LUA_GRIT_API)
 #if GLM_HAS_STATIC_ASSERT
-  GLM_STATIC_ASSERT((sizeof(lua_Float4) == sizeof(glmVector)), "Inconsistent Structures: lua_Float4 / glm::vec<4, glm_Float>");
-  GLM_STATIC_ASSERT((sizeof(lua_Mat4) == sizeof(glmMatrix)), "Inconsistent Structures: lua_Mat4 / glmMatrix");
+
+  // Additional defensive checks around the aliasing and alignment of lua_Mat4
+  // and glmMatrix.
+
+  GLM_STATIC_ASSERT(true
+    && sizeof(lua_Float4) == sizeof(glmVector)
+    && offsetof(lua_Float4, x) == offsetof(glmVector, v4.x)
+    && offsetof(lua_Float4, y) == offsetof(glmVector, v4.y)
+    && offsetof(lua_Float4, z) == offsetof(glmVector, v4.z)
+    && offsetof(lua_Float4, w) == offsetof(glmVector, v4.w)
+    && offsetof(glmVector, v2.x) == offsetof(glmVector, v4.x)
+    && offsetof(glmVector, v3.x) == offsetof(glmVector, v4.x), "Inconsistent Structures: lua_Float4 / glm::vec<4, glm_Float>"
+  );
+
+  GLM_STATIC_ASSERT(true
+    && sizeof(grit_length_t) == sizeof(glm::length_t)
+    && sizeof(lua_Mat4) == sizeof(glmMatrix)
+    // @TODO: Name the anonymous union in glmMatrix similar to lua_Mat4.
+    && sizeof(lua_Mat4::Columns::m2) == sizeof(glmMatrix::m24)
+    && sizeof(lua_Mat4::Columns::m3) == sizeof(glmMatrix::m34)
+    && sizeof(lua_Mat4::Columns::m4) == sizeof(glmMatrix::m44)
+    && offsetof(lua_Mat4, size) == offsetof(glmMatrix, size)
+    && offsetof(lua_Mat4, secondary) == offsetof(glmMatrix, secondary)
+    && offsetof(lua_Mat4, m.m2) == offsetof(glmMatrix, m24)
+    && offsetof(lua_Mat4, m.m3) == offsetof(glmMatrix, m34)
+    && offsetof(lua_Mat4, m.m4) == offsetof(glmMatrix, m44), "Inconsistent Structures: lua_Mat4 / glmMatrix"
+  );
 #endif
 
 /// <summary>
 /// A union for aliasing the Lua vector definition (lua_Float4) with the GLM
-/// vector definition. As these structures *should* be byte-wise identical and
-/// no alignment issues should exist.
+/// vector definition. As these structures are byte-wise identical, no alignment
+/// or strict-aliasing issues should exist.
 /// </summary>
 union glmVectorBoundary {
   glmVector glm;

@@ -45,15 +45,15 @@ SET(CMAKE_INSTALL_INC_DIR "${CMAKE_INSTALL_PREFIX}/include" CACHE PATH "Installa
 # Compiler Setup
 ################################################################################
 
-# Enables the use of Intel AVX2 if/when possible
-OPTION(LUA_NATIVE_ARCH "Enable compiler optimizations for the native processor architecture" ON)
+# Linux: Enable all instruction subsets supported by host.
+# MSVC: Enables the use of Intel AVX2 if/when possible; @TODO: Follow Linux.
+OPTION(LUA_NATIVE_ARCH "Enable compiler optimizations for the native processor architecture" OFF)
 
 # Include additional optimizations for glm-specific vector and matrix operations;
 OPTION(LUA_FAST_MATH "Enable fast math optimizations" OFF)
 
-# Enables the use of Intel AVX2 if/when possible
-# This option is intended to be a subset of LUA_NATIVE_ARCH
-OPTION(GLM_NATIVE_ARCH "Enable compiler optimizations for the native processor architecture" ON)
+# A subset of LUA_NATIVE_ARCH for only the GLM bindings
+OPTION(GLM_NATIVE_ARCH "Enable compiler optimizations for the native processor architecture" OFF)
 
 # Include additional optimizations for glm-specific vector and matrix operations;
 # This option is intended to be a subset of LUA_FAST_MATH
@@ -66,17 +66,18 @@ SET(glm_nativeFlags "")
 IF( MSVC )
   OPTION(LUA_USE_WINDOWS "Windows specific build" ON)
   OPTION(LUA_BUILD_AS_DLL "Build Lua library as DLL" ON)
+  OPTION(LUA_CRT_ALLOC "Replace the Windows CRT allocator with rpmalloc or mimalloc." OFF)
   IF( NOT( ${CMAKE_COMPILER_IS_CLANG} ) )
     MESSAGE(WARNING "MSVC detected! For MSVC/msbuild environments, it is advised to use the LLVM/ClangCL toolset")
   ENDIF()
 
-  IF(MSVC AND NOT "${CMAKE_BUILD_TYPE}" MATCHES "Debug")
+  IF(MSVC AND NOT (${CMAKE_BUILD_TYPE} MATCHES Debug))
     SET(MSVC_OPT_FLAG "/Ox /DNDEBUG")
   ELSE()
     SET(MSVC_OPT_FLAG "")
   ENDIF()
 
-  SET(glm_nativeFlags "${MSVC_OPT_FLAG} /GF /GS- /fp:except-")
+  SET(glm_nativeFlags "${MSVC_OPT_FLAG} /GF /GS-")
 
   IF( LUA_FAST_MATH )
     ADD_COMPILE_OPTIONS(/fp:fast /fp:except-)
@@ -107,10 +108,46 @@ IF( MSVC )
   IF( COMPILER_OPT_OB3 )
     STRING(REGEX REPLACE "[-/]Ob[1-4]" "" CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE}")
     STRING(REGEX REPLACE "[-/]Ob[1-4]" "" CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
+    STRING(REGEX REPLACE "[-/]Ob[1-4]" "" CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO}")
+    STRING(REGEX REPLACE "[-/]Ob[1-4]" "" CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
     STRING(REPLACE "/Ob2" "/Ob3" LUA_C_FLAGS "${LUA_C_FLAGS}")
 
     SET(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /Ob3")
     SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /Ob3")
+  ENDIF()
+
+  # Override the C runtime allocator on Windows
+  # @TODO: snmalloc support
+  IF( LUA_CRT_ALLOC )
+    IF( CMAKE_BUILD_TYPE AND ${CMAKE_BUILD_TYPE} MATCHES Debug )
+      MESSAGE(FATAL_ERROR "The Debug target isn't supported along with LUA_CRT_ALLOC!")
+    ENDIF()
+
+    STRING(REGEX REPLACE "/" "\\\\" LUA_CRT_ALLOC ${LUA_CRT_ALLOC})
+    IF( LUA_CRT_ALLOC MATCHES "rpmalloc$" )
+      ADD_DEFINITIONS(-DENABLE_OVERRIDE -DENABLE_PRELOAD)
+      SET(LUA_REL_FLAGS "${LUA_REL_FLAGS} /MT")
+
+      SET(LUA_ALLOCATOR_INCLUDE "${LUA_CRT_ALLOC}")
+      SET(LUA_ALLOCATOR_FILES "${LUA_CRT_ALLOC}/rpmalloc/rpmalloc.c")
+
+      # Search LUA_ALLOCATOR_FILES before the CRT library
+      ADD_LINK_OPTIONS(/INCLUDE:realloc)
+    ELSEIF( LUA_CRT_ALLOC MATCHES "mimalloc$" )
+      SET(MIMALLOC_LIB "${LUA_CRT_ALLOC}/out/msvc-x64/Release/mimalloc-static.lib")
+      SET(LUA_REL_FLAGS "${LUA_REL_FLAGS} /MD")
+      ADD_COMPILE_DEFINITIONS(/FI${LUA_CRT_ALLOC}/include/mimalloc-override.h)
+
+      # This runtime should never be using new/delete and all memory allocations
+      # should be routed through lua_Alloc. Worst case scenario a LuaCrtAllocator
+      # implementation exists for STL containers.
+      # ADD_COMPILE_DEFINITIONS(/FI${LUA_CRT_ALLOC}/include/mimalloc-new-delete.h)
+
+      LINK_LIBRARIES(${MIMALLOC_LIB})
+      ADD_LINK_OPTIONS(/INCLUDE:mi_version)
+    ELSE()
+      MESSAGE(FATAL_ERROR "(${LUA_CRT_ALLOC}) Cannot find the path to for the CRT allocator; currently only rpmalloc and mimalloc are supported")
+    ENDIF()
   ENDIF()
 
   SET(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} ${LUA_C_FLAGS} ${LUA_REL_FLAGS} /Oy")
@@ -161,12 +198,12 @@ ELSE()
   IF( LUA_NATIVE_ARCH )
     ADD_COMPILE_OPTIONS(-fno-stack-protector -flto)
     IF (NOT CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
-        ADD_COMPILE_OPTIONS(-fno-plt)
+      ADD_COMPILE_OPTIONS(-fno-plt)
     ENDIF()
   ELSEIF( GLM_NATIVE_ARCH )
     SET(glm_nativeFlags "${glm_nativeFlags} --fno-stack-protector -flto")
     IF (NOT CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
-        SET(glm_nativeFlags "${glm_nativeFlags} -fno-plt")
+      SET(glm_nativeFlags "${glm_nativeFlags} -fno-plt")
     ENDIF()
   ENDIF()
 
@@ -181,7 +218,7 @@ ELSE()
   ENDIF()
 
   # Change default release build flags
-  IF(NOT "${CMAKE_BUILD_TYPE}" MATCHES "Debug")
+  IF(NOT (${CMAKE_BUILD_TYPE} MATCHES Debug))
     ADD_COMPILE_OPTIONS(-DNDEBUG)
   ENDIF()
 
@@ -427,10 +464,10 @@ OPTION(LUA_NO_PARSER "Compile the Lua core so it does not contain the parsing \
   with luac, can be loaded." OFF
 )
 
-OPTION(GLM_LUA_NUMBER_TYPE "Use lua_Number as the vector primitive; float otherwise" OFF)
-OPTION(GLM_LUA_EPS_EQUAL "luaV_equalobj uses approximately equal (within glm::epsilon) for vector/matrix types (beware of hashing caveats)" OFF)
-OPTION(GLM_LUA_ROTATE_DIRECTION "How operator*(glm::mat4x4, glm::vec3) is handled" OFF)
-OPTION(GLM_LUA_APICHECK
+OPTION(LUA_GLM_NUMBER_TYPE "Use lua_Number as the vector primitive; float otherwise" OFF)
+OPTION(LUA_GLM_EPS_EQUAL "luaV_equalobj uses approximately equal (within glm::epsilon) for vector/matrix types (beware of hashing caveats)" OFF)
+OPTION(LUA_GLM_ROTATE_DIRECTION "How operator*(glm::mat4x4, glm::vec3) is handled" OFF)
+OPTION(LUA_GLM_APICHECK
   "Throw runtime errors when accessing matrices/vectors with invalid \
   keys/key-types. Otherwise, follow tables and set the result to nil" OFF
 )
@@ -460,16 +497,16 @@ IF( LUA_SANDBOX )
   ADD_COMPILE_DEFINITIONS(LUA_SANDBOX)
 ENDIF()
 
-IF( GLM_LUA_NUMBER_TYPE )
-  ADD_COMPILE_DEFINITIONS(GLM_LUA_NUMBER_TYPE)
+IF( LUA_GLM_NUMBER_TYPE )
+  ADD_COMPILE_DEFINITIONS(LUA_GLM_NUMBER_TYPE)
 ENDIF()
 
-IF( GLM_LUA_EPS_EQUAL )
-  ADD_COMPILE_DEFINITIONS(GLM_LUA_EPS_EQUAL)
+IF( LUA_GLM_EPS_EQUAL )
+  ADD_COMPILE_DEFINITIONS(LUA_GLM_EPS_EQUAL)
 ENDIF()
 
-IF( GLM_LUA_APICHECK )
-  ADD_COMPILE_DEFINITIONS(GLM_LUA_APICHECK)
+IF( LUA_GLM_APICHECK )
+  ADD_COMPILE_DEFINITIONS(LUA_GLM_APICHECK)
 ENDIF()
 
 IF( GRIT_POWER_DEFER )
@@ -600,7 +637,7 @@ IF( GLM_FORCE_LEFT_HANDED )
   ADD_COMPILE_DEFINITIONS(GLM_FORCE_LEFT_HANDED)
 ENDIF()
 
-IF ( GLM_FORCE_Z_UP )
+IF( GLM_FORCE_Z_UP )
   ADD_COMPILE_DEFINITIONS(GLM_FORCE_Z_UP)
 ENDIF()
 
@@ -624,30 +661,30 @@ IF( GLM_FORCE_QUAT_DATA_WXYZ )
   ADD_COMPILE_DEFINITIONS(GLM_FORCE_QUAT_DATA_WXYZ)
 ENDIF()
 
-IF ( LUA_GLM_INCLUDE_ALL )
+IF( LUA_GLM_INCLUDE_ALL )
   ADD_COMPILE_DEFINITIONS(LUA_GLM_INCLUDE_ALL)
 ENDIF()
 
-IF ( LUA_GLM_ALIASES )
+IF( LUA_GLM_ALIASES )
   ADD_COMPILE_DEFINITIONS(LUA_GLM_ALIASES)
 ENDIF()
 
-IF ( LUA_GLM_REPLACE_MATH )
+IF( LUA_GLM_REPLACE_MATH )
   ADD_COMPILE_DEFINITIONS(LUA_GLM_REPLACE_MATH)
 ENDIF()
 
-IF ( LUA_GLM_GEOM_EXTENSIONS )
+IF( LUA_GLM_GEOM_EXTENSIONS )
   ADD_COMPILE_DEFINITIONS(LUA_GLM_GEOM_EXTENSIONS)
 ENDIF()
 
-IF ( LUA_GLM_RECYCLE )
+IF( LUA_GLM_RECYCLE )
   ADD_COMPILE_DEFINITIONS(LUA_GLM_RECYCLE)
-  IF ( LUA_GLM_FORCED_RECYCLE )
+  IF( LUA_GLM_FORCED_RECYCLE )
     ADD_COMPILE_DEFINITIONS(LUA_GLM_FORCED_RECYCLE)
   ENDIF()
 ENDIF()
 
-IF ( LUA_GLM_DRIFT )
+IF( LUA_GLM_DRIFT )
   ADD_COMPILE_DEFINITIONS(LUA_GLM_DRIFT)
 ENDIF()
 
@@ -708,6 +745,9 @@ IF( NOT LUA_INCLUDE_TEST AND NOT ONE_LUA )
   ADD_LIBRARY(liblua SHARED ${SRC_LIB} ${SRC_LUAGLM} ${LUA_RC})
 
   TARGET_LINK_LIBRARIES(liblua ${LIBS})
+  TARGET_INCLUDE_DIRECTORIES(liblua SYSTEM PRIVATE ${LUA_ALLOCATOR_INCLUDE})
+  TARGET_SOURCES(liblua PRIVATE ${LUA_ALLOCATOR_FILES})
+
   SET_TARGET_PROPERTIES(liblua PROPERTIES OUTPUT_NAME lua${LIB_LUA_VER} CLEAN_DIRECT_OUTPUT 1)
   IF( LUA_BUILD_AS_DLL )
     TARGET_COMPILE_DEFINITIONS(liblua PUBLIC LUA_BUILD_AS_DLL)
@@ -729,6 +769,9 @@ ENDIF()
 # Create static library
 IF( NOT ONE_LUA )
   ADD_LIBRARY(liblua_static STATIC ${SRC_LIB} ${SRC_LUAGLM})
+  TARGET_INCLUDE_DIRECTORIES(liblua_static SYSTEM PRIVATE ${LUA_ALLOCATOR_INCLUDE})
+  TARGET_SOURCES(liblua_static PRIVATE ${LUA_ALLOCATOR_FILES})
+
   TARGET_LINK_LIBRARIES(liblua_static ${LIBS})
   SET_TARGET_PROPERTIES(liblua_static PROPERTIES OUTPUT_NAME lua${LIB_LUA_VER}_static CLEAN_DIRECT_OUTPUT 1)
 ELSE()
@@ -748,7 +791,7 @@ ENDIF()
 IF( NOT LUA_INCLUDE_LIBGLM AND NOT ONE_LUA )
   ADD_LIBRARY(glm MODULE ${SRC_LIBGLM})
   TARGET_INCLUDE_DIRECTORIES(glm PRIVATE ${INCLUDE_DIRECTORIES})
-  IF ( LUA_INCLUDE_TEST )
+  IF( LUA_INCLUDE_TEST )
     TARGET_LINK_LIBRARIES(glm ${LIBS} liblua_static)
   ELSE()
     TARGET_LINK_LIBRARIES(glm ${LIBS} liblua)
@@ -769,6 +812,8 @@ ENDIF()
 IF( ONE_LUA )
   ADD_EXECUTABLE(lua ${SRC_ONELUA} ${LUA_RC})
   TARGET_COMPILE_DEFINITIONS(lua PUBLIC MAKE_LUA)
+  TARGET_INCLUDE_DIRECTORIES(lua SYSTEM PRIVATE ${LUA_ALLOCATOR_INCLUDE})
+  TARGET_SOURCES(lua PRIVATE ${LUA_ALLOCATOR_FILES})
 ELSE()
   ADD_EXECUTABLE(lua ${SRC_LUA} ${LUA_RC})
 ENDIF()

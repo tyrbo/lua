@@ -73,6 +73,9 @@ namespace glm {
   template<typename T, qualifier Q, class Matrix>
   GLM_GEOM_QUALIFIER AABB<3, T, Q> transformAsAABB(const AABB<3, T, Q> &aabb, const Matrix &m);
 
+  template<typename T, qualifier Q, class Matrix>
+  GLM_GEOM_QUALIFIER AABB<2, T, Q> transformAsAABB(const AABB<2, T, Q> &aabb, const Matrix &m);
+
   template<length_t L, typename T, qualifier Q>
   static AABB<L, T, Q> operator-(const AABB<L, T, Q> &aabb) {
     return AABB<L, T, Q>(-aabb.maxPoint, -aabb.minPoint);
@@ -93,31 +96,36 @@ namespace glm {
     return AABB<L, T, Q>(aabb.minPoint - point, aabb.maxPoint - point);
   }
 
-  template<typename T, qualifier Q>
-  static AABB<3, T, Q> operator*(const mat<3, 3, T, Q> &m, const AABB<3, T, Q> &aabb) {
+  template<length_t L, typename T, qualifier Q>
+  static AABB<L, T, Q> operator*(const mat<3, 3, T, Q> &m, const AABB<L, T, Q> &aabb) {
     return transformAsAABB<T, Q, mat<3, 3, T, Q>>(aabb, m);
   }
 
-  template<typename T, qualifier Q>
-  static AABB<3, T, Q> operator*(const mat<3, 4, T, Q> &m, const AABB<3, T, Q> &aabb) {
+  template<length_t L, typename T, qualifier Q>
+  static AABB<L, T, Q> operator*(const mat<3, 4, T, Q> &m, const AABB<L, T, Q> &aabb) {
     return transformAsAABB<T, Q, mat<3, 4, T, Q>>(aabb, m);
   }
 
-  template<typename T, qualifier Q>
-  static AABB<3, T, Q> operator*(const mat<4, 3, T, Q> &m, const AABB<3, T, Q> &aabb) {
+  template<length_t L, typename T, qualifier Q>
+  static AABB<L, T, Q> operator*(const mat<4, 3, T, Q> &m, const AABB<L, T, Q> &aabb) {
     return transformAsAABB<T, Q, mat<4, 3, T, Q>>(aabb, m);
   }
 
-  template<typename T, qualifier Q>
-  static AABB<3, T, Q> operator*(const mat<4, 4, T, Q> &m, const AABB<3, T, Q> &aabb) {
+  template<length_t L, typename T, qualifier Q>
+  static AABB<L, T, Q> operator*(const mat<4, 4, T, Q> &m, const AABB<L, T, Q> &aabb) {
     return transformAsAABB<T, Q, mat<4, 4, T, Q>>(aabb, m);
   }
 
+  template<length_t L, typename T, qualifier Q>
+  static AABB<L, T, Q> operator*(const qua<T, Q> &q, const AABB<L, T, Q> &aabb) {
+    const vec<L, T, Q> center = q * centerPoint(aabb);
+    const vec<L, T, Q> newDir = abs((q * size(aabb)) * T(0.5));
+    return AABB<L, T, Q>(center - newDir, center + newDir);
+  }
+
   template<typename T, qualifier Q>
-  static AABB<3, T, Q> operator*(const qua<T, Q> &q, const AABB<3, T, Q> &aabb) {
-    const vec<3, T, Q> center = q * centerPoint(aabb);
-    const vec<3, T, Q> newDir = abs((q * size(aabb)) * T(0.5));
-    return AABB<3, T, Q>(center - newDir, center + newDir);
+  static AABB<2, T, Q> operator*(const qua<T, Q> &q, const AABB<2, T, Q> &aabb) {
+    return operator*(toMat3(q), aabb);
   }
 
   template<length_t L, typename T, qualifier Q>
@@ -208,6 +216,16 @@ namespace glm {
     return all(isfinite(aabb.minPoint)) && all(isfinite(aabb.maxPoint));
   }
 
+  template<typename T, qualifier Q>
+  GLM_GEOM_QUALIFIER T width(const AABB<2, T, Q> &aabb) {
+    return aabb.maxPoint.x - aabb.minPoint.x;
+  }
+
+  template<typename T, qualifier Q>
+  GLM_GEOM_QUALIFIER T height(const AABB<2, T, Q> &aabb) {
+    return aabb.maxPoint.y - aabb.minPoint.y;
+  }
+
   /// <summary>
   /// Return true if the AABB is degenerate (i.e., does not span in a strictly
   /// positive volume).
@@ -223,6 +241,16 @@ namespace glm {
   template<typename T, qualifier Q>
   GLM_GEOM_QUALIFIER bool isDegenerate(const AABB<3, T, Q> &aabb) {
     return aabb.minPoint.x >= aabb.maxPoint.x || aabb.minPoint.y >= aabb.maxPoint.y || aabb.minPoint.z >= aabb.maxPoint.z;
+  }
+
+  template<typename T, qualifier Q>
+  GLM_GEOM_QUALIFIER bool isDegenerate(const AABB<2, T, Q> &aabb) {
+    return aabb.minPoint.x >= aabb.maxPoint.x || aabb.minPoint.y >= aabb.maxPoint.y;
+  }
+
+  template<typename T, qualifier Q>
+  GLM_GEOM_QUALIFIER bool hasNegativeVolume(const AABB<2, T, Q> &aabb) {
+    return aabb.maxPoint.x < aabb.minPoint.x || aabb.maxPoint.y < aabb.minPoint.y;
   }
 
   /// <summary>
@@ -283,6 +311,18 @@ namespace glm {
     }
   }
 
+  template<typename T, qualifier Q>
+  GLM_GEOM_QUALIFIER LineSegment<2, T, Q> edge(const AABB<2, T, Q> &aabb, int edgeIndex) {
+    switch (edgeIndex) {
+      case 1: return LineSegment<2, T, Q>(vec<2, T, Q>(aabb.maxPoint.x, aabb.minPoint.y), aabb.maxPoint);
+      case 2: return LineSegment<2, T, Q>(aabb.maxPoint, vec<2, T, Q>(aabb.minPoint.x, aabb.maxPoint.y));
+      case 3: return LineSegment<2, T, Q>(vec<2, T, Q>(aabb.minPoint.x, aabb.maxPoint.y), aabb.minPoint);
+      case 0:
+      default:  // First Point
+        return LineSegment<2, T, Q>(aabb.minPoint, vec<2, T, Q>(aabb.maxPoint.x, aabb.minPoint.y));
+    }
+  }
+
   /// <summary>
   /// Return a corner point of the AABB: [0, 7].
   /// </summary>
@@ -296,6 +336,22 @@ namespace glm {
       case 5: return vec<3, T, Q>(aabb.maxPoint.x, aabb.minPoint.y, aabb.maxPoint.z);
       case 6: return vec<3, T, Q>(aabb.maxPoint.x, aabb.maxPoint.y, aabb.minPoint.z);
       case 7:
+        return aabb.maxPoint;
+      case 0:
+      default:
+        return aabb.minPoint;
+    }
+  }
+
+  /// <summary>
+  /// Return a corner point of the AABB: [0, 3].
+  /// </summary>
+  template<typename T, qualifier Q>
+  GLM_GEOM_QUALIFIER vec<2, T, Q> cornerPoint(const AABB<2, T, Q> &aabb, int index) {
+    switch (index) {
+      case 1: return vec<2, T, Q>(aabb.minPoint.x, aabb.maxPoint.y);
+      case 2: return vec<2, T, Q>(aabb.maxPoint.x, aabb.minPoint.y);
+      case 3:
         return aabb.maxPoint;
       case 0:
       default:
@@ -520,6 +576,21 @@ namespace glm {
     return AABB<3, T, Q>(newCenter - newDir, newCenter + newDir);
   }
 
+  template<typename T, qualifier Q, class Matrix>
+  GLM_GEOM_QUALIFIER AABB<2, T, Q> transformAsAABB(const AABB<2, T, Q> &aabb, const Matrix &m) {
+    const T ax = m[0][0] * aabb.minPoint.x;
+    const T bx = m[0][0] * aabb.maxPoint.x;
+    const T ay = m[1][0] * aabb.minPoint.y;
+    const T by = m[1][0] * aabb.maxPoint.y;
+    const T ax2 = m[0][1] * aabb.minPoint.x;
+    const T bx2 = m[0][1] * aabb.maxPoint.x;
+    const T ay2 = m[1][1] * aabb.minPoint.y;
+    const T by2 = m[1][1] * aabb.maxPoint.y;
+    return AABB<2, T, Q>(
+    vec<2, T, Q>(min(ax, bx) + min(ay, by) + m[3][0], min(ax2, bx2) + min(ay2, by2) + m[3][1]),
+    vec<2, T, Q>(max(ax, bx) + max(ay, by) + m[3][0], max(ax2, bx2) + max(ay2, by2) + m[3][1]));
+  }
+
   /// <summary>
   /// Computes the closest point inside the AABB to the given point.
   /// </summary>
@@ -565,6 +636,18 @@ namespace glm {
            && aabb.minPoint.z <= point.z && point.z <= aabb.maxPoint.z;
   }
 
+#if GLM_CONFIG_ALIGNED_GENTYPES == GLM_ENABLE && (GLM_ARCH & GLM_ARCH_SSE41_BIT)
+  /// <summary>
+  /// @NOTE Experimental
+  /// </summary>
+  GLM_GEOM_QUALIFIER bool contains(const AABB<4, float, aligned_highp> &aabb, const vec<4, float, aligned_highp> &point) {
+    const glm_vec4 a = _mm_cmplt_ps(point.data, aabb.minPoint.data);
+    const glm_vec4 b = _mm_cmpgt_ps(point.data, aabb.maxPoint.data);
+    const glm_vec4 c = _mm_or_ps(a, b);
+    return _mm_vec3_allzero(c) != 0;
+  }
+#endif
+
   template<typename T, qualifier Q>
   GLM_GEOM_QUALIFIER bool contains(const AABB<3, T, Q> &aabb, const vec<3, T, Q> &minPoint, const vec<3, T, Q> &maxPoint) {
     return aabb.minPoint.x <= minPoint.x && maxPoint.x <= aabb.maxPoint.x
@@ -579,7 +662,7 @@ namespace glm {
   }
 
   template<typename T, qualifier Q>
-  GLM_GEOM_QUALIFIER bool contains(const AABB<2, T, Q> &aabb, const vec<3, T, Q> &minPoint, const vec<2, T, Q> &maxPoint) {
+  GLM_GEOM_QUALIFIER bool contains(const AABB<2, T, Q> &aabb, const vec<2, T, Q> &minPoint, const vec<2, T, Q> &maxPoint) {
     return aabb.minPoint.x <= minPoint.x && maxPoint.x <= aabb.maxPoint.x
            && aabb.minPoint.y <= minPoint.y && maxPoint.y <= aabb.maxPoint.y;
   }
@@ -588,6 +671,18 @@ namespace glm {
   GLM_GEOM_QUALIFIER bool contains(const AABB<L, T, Q> &aabb, const AABB<L, T, Q> &otheraabb) {
     return contains(aabb, otheraabb.minPoint, otheraabb.maxPoint);
   }
+
+#if GLM_CONFIG_ALIGNED_GENTYPES == GLM_ENABLE && (GLM_ARCH & GLM_ARCH_SSE41_BIT)
+  /// <summary>
+  /// @NOTE Experimental
+  /// </summary>
+  GLM_GEOM_QUALIFIER bool contains(const AABB<4, float, aligned_highp> &aabb, const AABB<4, float, aligned_highp> &otheraabb) {
+    const glm_vec4 a = _mm_cmplt_ps(otheraabb.minPoint.data, aabb.minPoint.data);
+    const glm_vec4 b = _mm_cmpgt_ps(otheraabb.maxPoint.data, aabb.maxPoint.data);
+    const glm_vec4 c = _mm_or_ps(a, b);
+    return _mm_vec3_allzero(c) != 0;
+  }
+#endif
 
   template<length_t L, typename T, qualifier Q>
   GLM_GEOM_QUALIFIER bool contains(const AABB<L, T, Q> &aabb, const LineSegment<L, T, Q> &lineSegment) {
@@ -641,6 +736,32 @@ namespace glm {
   template<length_t L, typename T, qualifier Q>
   GLM_GEOM_QUALIFIER AABB<L, T, Q> enclose(const AABB<L, T, Q> &aabb, const Polygon<L, T, Q> &polygon) {
     return enclose(aabb, minimalEnclosingAABB(polygon));
+  }
+
+  /// <summary>
+  /// Generalized compute the intersection of a line (or ray) and the AABB.
+  /// </summary>
+  /// <param name="tNear">The distance to intersect (enter) the AABB</param>
+  /// <param name="tFar">The distance to exit the AABB</param>
+  template<length_t L, typename T, qualifier Q>
+  GLM_GEOM_QUALIFIER bool intersectLineAABB(const AABB<L, T, Q> &aabb, const Line<L, T, Q> &line, T &tNear, T &tFar) {
+    for (length_t i = 0; i < L; ++i) { // test each cardinal plane
+      if (!equal(line.dir[i], T(0), epsilon<T>())) {
+        const T recipDir = T(1) / line.dir[i];
+        const T t1 = (aabb.minPoint[i] - line.pos[i]) * recipDir;
+        const T t2 = (aabb.maxPoint[i] - line.pos[i]) * recipDir;
+        if (t1 < t2)
+          tNear = max(t1, tNear), tFar = min(t2, tFar);
+        else  // Swap t1 and t2.
+          tNear = max(t2, tNear), tFar = min(t1, tFar);
+
+        if (tNear > tFar)
+          return false;  // exit before entering; AABB missed.
+      }
+      else if (line.pos[i] < aabb.minPoint[i] || line.pos[i] > aabb.maxPoint[i])
+        return false;  // AABB completely missed.
+    }
+    return tNear <= tFar;
   }
 
   /// <summary>
@@ -733,7 +854,7 @@ namespace glm {
   }
 
   template<glm::length_t L, typename T, qualifier Q>
-  GLM_GEOM_QUALIFIER bool intersects(const AABB<3, T, Q> &aabb, const LineSegment<L, T, Q> &lineSegment, T &dNear, T &dFar) {
+  GLM_GEOM_QUALIFIER bool intersects(const AABB<L, T, Q> &aabb, const LineSegment<L, T, Q> &lineSegment, T &dNear, T &dFar) {
     const vec<L, T, Q> dir = lineSegment.dir2();
     const T len = length(dir);
     if (len <= epsilon<T>()) {  // Degenerate line segment
@@ -756,7 +877,7 @@ namespace glm {
   GLM_GEOM_QUALIFIER bool intersects(const AABB<L, T, Q> &aabb, const AABB<L, T, Q> &other) {
     bool result = true;
     for (length_t i = 0; i < L; ++i)
-      result &= aabb.minPoint[i] < other.maxPoint[i] && aabb.minPoint[i] < other.maxPoint[i];
+      result &= aabb.minPoint[i] < other.maxPoint[i] && other.minPoint[i] < aabb.maxPoint[i];
     return result;
   }
 
@@ -784,6 +905,18 @@ namespace glm {
            && other.minPoint.z < aabb.maxPoint.z;
   }
 
+#if GLM_CONFIG_ALIGNED_GENTYPES == GLM_ENABLE && (GLM_ARCH & GLM_ARCH_SSE41_BIT)
+  /// <summary>
+  /// @EXPERIMENT: Depends on SSE41
+  /// </summary>
+  GLM_GEOM_QUALIFIER bool intersects(const AABB<4, float, aligned_highp> &aabb, const AABB<4, float, aligned_highp> &other) {
+    const glm_vec4 a = _mm_cmpge_ps(aabb.minPoint.data, other.maxPoint.data);
+    const glm_vec4 b = _mm_cmpge_ps(other.minPoint.data, aabb.maxPoint.data);
+    const glm_vec4 c = _mm_or_ps(a, b);
+    return _mm_vec3_allzero(c) != 0;
+  }
+#endif
+
   template<typename T, qualifier Q>
   GLM_GEOM_QUALIFIER bool intersects(const AABB<2, T, Q> &aabb, const AABB<2, T, Q> &other) {
     return aabb.minPoint.x < other.maxPoint.x
@@ -795,9 +928,9 @@ namespace glm {
   /// <summary>
   /// Return the intersection of two AABBs, i.e., the AABB that is contained in both.
   /// </summary>
-  template<typename T, qualifier Q>
-  GLM_GEOM_QUALIFIER AABB<3, T, Q> intersection(const AABB<3, T, Q> &aabb, const AABB<3, T, Q> &other) {
-    return AABB<3, T, Q>(max(aabb.minPoint, other.minPoint), min(aabb.maxPoint, other.maxPoint));
+  template<length_t L, typename T, qualifier Q>
+  GLM_GEOM_QUALIFIER AABB<L, T, Q> intersection(const AABB<L, T, Q> &aabb, const AABB<L, T, Q> &other) {
+    return AABB<L, T, Q>(max(aabb.minPoint, other.minPoint), min(aabb.maxPoint, other.maxPoint));
   }
 
   namespace detail {
