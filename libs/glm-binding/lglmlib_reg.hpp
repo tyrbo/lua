@@ -643,18 +643,18 @@ GLM_LUA_REG(bitfieldInsert),
 GLM_LUA_REG(bitfieldReverse),
 GLM_LUA_REG(findLSB),
 GLM_LUA_REG(findMSB),
-GLM_LUA_REG(findNSB),
 //GLM_LUA_REG(imulExtended),
 //GLM_LUA_REG(uaddCarry),
 //GLM_LUA_REG(umulExtended),
 //GLM_LUA_REG(usubBorrow),
 #endif
 
-#if defined(EXT_SCALAR_INTEGER_HPP)
-GLM_LUA_REG(bitfieldDeinterleave),
+#if defined(EXT_SCALAR_INTEGER_HPP) || defined(EXT_VECTOR_INTEGER_HPP)
+GLM_LUA_REG(findNSB),
 #endif
 
 #if defined(GTC_BITFIELD_HPP)
+GLM_LUA_REG(bitfieldDeinterleave),
 GLM_LUA_REG(bitfieldFillOne),
 GLM_LUA_REG(bitfieldFillZero),
 GLM_LUA_REG(bitfieldInterleave),
@@ -1062,4 +1062,9 @@ GLM_LUA_REG(shearZ3D),
 #if defined(GTX_MATRIX_TRANSFORM_2D_HPP)
 GLM_LUA_REG(shearX),
 GLM_LUA_REG(shearY),
+#endif
+
+#if defined(GTX_PCA_HPP)
+GLM_LUA_REG(findEigenvaluesSymReal),
+GLM_LUA_REG(computeCovarianceMatrix),
 #endif

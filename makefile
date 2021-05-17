@@ -62,7 +62,10 @@ CWARNSC= -Wdeclaration-after-statement \
 # Your platform. See PLATS for possible values.
 PLAT= guess
 
-#CC= gcc -std=gnu99 $(CWARNSCPP) $(CWARNSC) $(CWARNGCC)
+# See LUA_C_LINKAGE definition in source. If "CC" replaces gcc with g++, then
+# LUA_LINKAGE needs to be undefined
+# LUA_LINKAGE= -DLUA_C_LINKAGE
+
 CC= g++ -std=c++11 $(CWARNSCPP) $(CWARNGCC)
 CPP= g++ -std=c++11 $(CWARNSCPP) $(CWARNGCC)
 CFLAGS= -O2 -Wall -Wextra -DNDEBUG -DLUA_COMPAT_5_3 $(SYSCFLAGS) $(MYCFLAGS)
@@ -89,7 +92,6 @@ LUA_PATCHES = -DLUA_C99_MATHLIB  \
 		-DGRIT_POWER_TABINIT \
 		-DGRIT_POWER_SAFENAV \
 		-DGRIT_POWER_CCOMMENT \
-		-DGRIT_POWER_ANONDO \
 		-DGRIT_POWER_JOAAT \
 		-DGRIT_POWER_EACH \
 		-DGRIT_POWER_WOW \
@@ -101,6 +103,7 @@ GLM_FLAGS = -DGLM_ENABLE_EXPERIMENTAL \
 		-DGLM_FORCE_INTRINSICS \
 		-DGLM_FORCE_INLINE \
 		-DGLM_FORCE_Z_UP \
+		-DGLM_FORCE_QUAT_DATA_XYZW \
 		-DLUA_GLM_INCLUDE_ALL \
 		-DLUA_GLM_ALIASES \
 		-DLUA_GLM_GEOM_EXTENSIONS \
@@ -228,13 +231,13 @@ lglm.o: lglm.cpp lua.h luaconf.h lglm.hpp lua.hpp lualib.h \
  lauxlib.h lglm_core.h llimits.h ltm.h lobject.h lglm_string.hpp \
  lgrit_lib.h lapi.h lstate.h lzio.h lmem.h ldebug.h lfunc.h lgc.h \
  lstring.h ltable.h lvm.h ldo.h
-	$(CPP) $(CFLAGS) $(CPERF_FLAGS) $(TESTS) -c -o lglm.o lglm.cpp
+	$(CPP) $(LUA_LINKAGE) $(CFLAGS) $(CPERF_FLAGS) $(TESTS) -c -o lglm.o lglm.cpp
 
 # lua-glm binding
 GLM_A = glm.so
 
 lib-glm:
-	$(CPP) $(CFLAGS) $(CPERF_FLAGS) $(TESTS) -fPIC -I. -Ilibs/glm-binding -shared -o $(GLM_A) libs/glm-binding/lglmlib.cpp $(LIBS)
+	$(CPP) $(LUA_LINKAGE) $(CFLAGS) $(CPERF_FLAGS) $(TESTS) -fPIC -I. -Ilibs/glm-binding -shared -o $(GLM_A) libs/glm-binding/lglmlib.cpp $(LIBS)
 
 lib-glm-mingw:
 	$(MAKE) lib-glm SYSCFLAGS="-L . -DLUA_BUILD_AS_DLL" GLM_A="glm.dll" SYSLIBS="-llua" SYSLDFLAGS="-s"

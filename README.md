@@ -238,6 +238,7 @@ Modules/functions not bound to LuaGLM due to compatibility issues, usefulness, o
 - glm/gtx/bit.hpp: `powerOfTwoAbove`, `powerOfTwoBelow`, `powerOfTwoNearest`;
 - glm/gtx/range.hpp: `begin`, `end`;
 - glm/ext/vector_relational.hpp:  `equal(..., vec<L, int, Q> const& ULPs)`, as the current Lua binding cannot differentiate between it and `(..., vec<L, T, Q> const& epsilon)`.
+- glm/gtx/pca.hpp: `sortEigenvalues`: Function incorrectly declared and manipulates the parameters in place.
 
 ## Power Patches
 This runtime [imports](http://lua-users.org/wiki/LuaPowerPatches) many (small) useful changes to the Lua runtime, all bound to preprocessor flags:
@@ -285,19 +286,6 @@ Support for C-style block comments: ``/* Comment */``, e.g.,
 print("Hello, World!") /* Comment */
 ```
 
-#### Parameterless Do:
-Syntactic sugar for ``function() ... end`` statements, e.g.,
-
-```lua
-do --[[ CodeBlock ]] end
-```
-
-is functionally equivalent to:
-
-```lua
-function() --[[ CodeBlock ]] end
-```
-
 #### Compile Time Jenkins' Hashes:
 String literals wrapped in back-ticks are Jenkins' one-at-a-time hashed when parsed.
 
@@ -330,12 +318,12 @@ Note: for compatibility reasons, all hashes returned are sign-extended:
 Reintroduce compatibility for the ``__ipairs`` metamethod that was deprecated in 5.3 and removed in 5.4.
 
 #### Defer:
-Import ``func2close`` from ltests.h into the base library. Initially, Lua 5.4 was designed so that functions could be treated as to-be-closed variables. However, that feature interacts poorly with sandboxing and coroutines (see: [No more to-be-closed functions](https://github.com/lua/lua/commit/4ace93ca6502dd1da38d5c06fa099d229e791ba8)).
+Import the defer statement from [Ravi](https://github.com/dibyendumajumdar/ravi/tree/master/patches) into the runtime. In addition `func2close` from ltests.h has been imported into the base library.
 
 ```lua
 -- closing function. Could also be used to supply a to-be-closed variable to a
 -- generic for loop
-local _ <close> = defer(function() numopen = numopen - 1 end)
+defer numopen = numopen - 1 end
 ```
 
 #### Each Iteration:
@@ -486,8 +474,6 @@ A CMake project that builds the stand-alone interpreter (`lua`), a compiler (`lu
 └> make
 ```
 
-Note: for msbuild environments, it's preferred to the the LLVM toolset (`-T llvm`).
-
 ### Lua Preprocessor Configurations
 Note, not all Lua-specific options are listed.
 
@@ -513,7 +499,6 @@ Note, not all Lua-specific options are listed.
   - **GRIT\_POWER\_INTABLE**
   - **GRIT\_POWER\_TABINIT**
   - **GRIT\_POWER\_CCOMMENT**
-  - **GRIT\_POWER\_ANONDO**
   - **GRIT\_POWER\_JOAAT**
   - **GRIT\_POWER\_EACH**
   - **GRIT\_POWER\_BLOB**
@@ -561,6 +546,9 @@ For all GLM preprocessor flags, see the [GLM manual](https://github.com/g-truc/g
     true
     ```
 
+#### CRT Allocator
+Inspired by `LLVM_INTEGRATED_CRT_ALLOC`, the CMake project includes the ability to replace the default Windows CRT allocator. Only [rpmalloc](https://github.com/mjansson/rpmalloc) and [mimalloc](https://github.com/microsoft/mimalloc) are supported at the moment; use `-DLUA_CRT_ALLOC="path/to/rpmalloc"`.
+
 ## Developer Notes:
 See [libs/scripts](libs/scripts) for a collection of example/test scripts using these added features.
 
@@ -587,14 +575,16 @@ See [libs/scripts](libs/scripts) for a collection of example/test scripts using 
     ```
 
 #### Tweaks/TODO:
+Ordered by priority.
 1. Fix/improve MSVC portions of CMakeLists.
-1. Finish support for two-dimensional geometrical structures (AABB2D, LineSegment2D, Circle2D, etc).
 1. [geom](libs/glm-binding/geom): SIMD support (at the very least for the most commonly used functions).
+1. Add support for two-dimensional geometrical structures (Ray2D, Line2D, Plane2D).
 1. Optimize `glm_createMatrix`. Profiling case '4x4 matrix creation (lua_Alloc)' is the one of the slowest operations in the added vector/matrix API. Worse when using the default Windows allocator.
 1. Improve build scripts for linking against custom allocators. [rpmalloc](https://github.com/mjansson/rpmalloc) has shown significant upsides for cases of tight loops that allocate many matrix objects. For example, the profiling case '4x4 matrix - 4 component matrix * matrix' (using TM_MUL; generational GC enabled) halved its execution time.
-1. Features/configurations to reduce size of binding library.
+1. Include GLM version control in binding library to support older GLM versions.
 1. Improve support for `glm::mat3x4` and `glm::mat4x3`.
 1. `glmMat_set` support for tables, e.g., `mat[i] = { ... }`, by using `glmH_tovector`.
+1. Features/configurations to reduce size of binding library.
 
 ## Benchmarking
 **TODO**: Finish comparisons to...

@@ -482,7 +482,6 @@ OPTION(GRIT_POWER_TABINIT "Syntactic sugar to improve the syntax for specifying 
 OPTION(GRIT_POWER_SAFENAV "An indexing operation that suppresses errors on accesses into undefined table" ON)
 OPTION(GRIT_POWER_CCOMMENT "Support for C-style block comments" ON)
 OPTION(GRIT_POWER_NAMESPACE_SEL "Allow double-colon tokens to be used as field selection (e.g., CPP namespaces)" OFF)
-OPTION(GRIT_POWER_ANONDO "Syntactic sugar for empty-function statements using do/end" ON)
 OPTION(GRIT_POWER_WOW "Expose lua_createtable and other WowLua compatibility functions" ON)
 OPTION(GRIT_POWER_CHRONO "Enable nanosecond resolution timers and x86 rdtsc sampling" ON)
 OPTION(GRIT_POWER_EACH "__iter metamethod support; see documentation" ON)
@@ -549,10 +548,6 @@ IF( GRIT_POWER_NAMESPACE_SEL )
   ADD_COMPILE_DEFINITIONS(GRIT_POWER_NAMESPACE_SEL)
 ENDIF()
 
-IF( GRIT_POWER_ANONDO )
-  ADD_COMPILE_DEFINITIONS(GRIT_POWER_ANONDO)
-ENDIF()
-
 IF( GRIT_POWER_EACH )
   ADD_COMPILE_DEFINITIONS(GRIT_POWER_EACH)
 ENDIF()
@@ -588,7 +583,10 @@ OPTION(GLM_FORCE_DEPTH_ZERO_TO_ONE "Force the use of a clip space between 0 to 1
 OPTION(GLM_FORCE_SIZE_T_LENGTH "length_t is a typedef of size_t, otherwise length_t is a typedef of int like GLSL defines it." OFF)
 OPTION(GLM_FORCE_UNRESTRICTED_GENTYPE "Removing genType restriction" OFF)
 OPTION(GLM_FORCE_SILENT_WARNINGS "Silent C++ warnings from language extensions" OFF)
-OPTION(GLM_FORCE_QUAT_DATA_WXYZ "Removing genType restriction" OFF)
+
+# Formerly known as 'GLM_FORCE_QUAT_DATA_WXYZ', however, changed without support
+# for backwards compatibility in-mind; must be compensated for in source.
+OPTION(GLM_FORCE_QUAT_DATA_XYZW "Force GLM to store quat data as x,y,z,w instead of w,x,y,z" ON)
 # GLM_FORCE_PRECISION_{ LOWP_FLOAT, MEDIUMP_FLOAT, HIGHP_FLOAT }
 
 ADD_COMPILE_DEFINITIONS(GLM_ENABLE_EXPERIMENTAL)
@@ -596,6 +594,9 @@ ADD_COMPILE_DEFINITIONS(GLM_ENABLE_EXPERIMENTAL)
 # lua-glm Options
 OPTION(GLM_FORCE_Z_UP "Unit up vector is along the Z-axis (Y-axis otherwise)" ON)
 OPTION(LUA_GLM_INCLUDE_ALL "Include all GLM modules, glm/gtc/gtx" ON)
+OPTION(LUA_GLM_INCLUDE_EXT "Include ext headers: Stable extensions not specified by GLSL specification " OFF)
+OPTION(LUA_GLM_INCLUDE_GTC "Include gtc headers: Recommended extensions not specified by GLSL specification" OFF)
+OPTION(LUA_GLM_INCLUDE_GTX "Include gtx headers: Experimental extensions not specified by GLSL specification" OFF)
 OPTION(LUA_GLM_ALIASES "Include all function aliases" ON)
 OPTION(LUA_GLM_REPLACE_MATH "Replace the global math library on library initialization" OFF)
 OPTION(LUA_GLM_GEOM_EXTENSIONS "Extend geometry API" ON)
@@ -657,11 +658,27 @@ IF( GLM_FORCE_SILENT_WARNINGS )
   ADD_COMPILE_DEFINITIONS(GLM_FORCE_SILENT_WARNINGS)
 ENDIF()
 
-IF( GLM_FORCE_QUAT_DATA_WXYZ )
-  ADD_COMPILE_DEFINITIONS(GLM_FORCE_QUAT_DATA_WXYZ)
+IF( GLM_FORCE_QUAT_DATA_XYZW )
+  ADD_COMPILE_DEFINITIONS(GLM_FORCE_QUAT_DATA_XYZW)
+ENDIF()
+
+IF( LUA_GLM_INCLUDE_EXT )
+  ADD_COMPILE_DEFINITIONS(LUA_GLM_INCLUDE_EXT)
+ENDIF()
+
+IF( LUA_GLM_INCLUDE_GTC )
+  ADD_COMPILE_DEFINITIONS(LUA_GLM_INCLUDE_GTC)
+ENDIF()
+
+IF( LUA_GLM_INCLUDE_GTX )
+  ADD_COMPILE_DEFINITIONS(LUA_GLM_INCLUDE_GTX)
 ENDIF()
 
 IF( LUA_GLM_INCLUDE_ALL )
+  # Future-proof by including the above options
+  ADD_COMPILE_DEFINITIONS(LUA_GLM_INCLUDE_EXT)
+  ADD_COMPILE_DEFINITIONS(LUA_GLM_INCLUDE_GTC)
+  ADD_COMPILE_DEFINITIONS(LUA_GLM_INCLUDE_GTX)
   ADD_COMPILE_DEFINITIONS(LUA_GLM_INCLUDE_ALL)
 ENDIF()
 
