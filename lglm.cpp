@@ -80,11 +80,13 @@ static TValue *glm_index2value(lua_State *L, int idx) {
   else { /* upvalues */
     idx = LUA_REGISTRYINDEX - idx;
     api_check(L, idx <= MAXUPVAL + 1, "upvalue index too large");
-    if (ttislcf(s2v(ci->func)))  /* light C function? */
-      return &G(L)->nilvalue;  /* it has no upvalues */
-    else {
+    if (ttisCclosure(s2v(ci->func))) { /* C closure? */
       CClosure *func = clCvalue(s2v(ci->func));
       return (idx <= func->nupvalues) ? &func->upvalue[idx - 1] : &G(L)->nilvalue;
+    }
+    else { /* light C function or Lua function (through a hook)?) */
+      api_check(L, ttislcf(s2v(ci->func)), "caller not a C function");
+      return &G(L)->nilvalue; /* no upvalues */
     }
   }
 }
@@ -1816,7 +1818,16 @@ static int vec_trybinTM(lua_State *L, const TValue *p1, const TValue *p2, StkId 
       else if (tt_p2 == LUA_VQUAT) {
         switch (tt_p1) {
           case LUA_VVECTOR3: glm_setvvalue2s(res, v.v3 * glm_quatvalue(p2).q, LUA_VVECTOR3); return 1;
+#if defined(GLM_FORCE_DEFAULT_ALIGNED_GENTYPES)
+          case LUA_VVECTOR4: {
+            const glm::qua<glm_Float> x = glm::inverse(glm_quatvalue(p2).q);
+            const glm::vec<4, glm_Float> result = glm::detail::compute_quat_mul_vec4<glm_Float, glm::defaultp, false>::call(x, v.v4);
+            glm_setvvalue2s(res, result, LUA_VVECTOR4);
+            return 1;
+          }
+#else
           case LUA_VVECTOR4: glm_setvvalue2s(res, v.v4 * glm_quatvalue(p2).q, LUA_VVECTOR4); return 1;
+#endif
           default:
             break;
         }
@@ -1967,8 +1978,16 @@ static int quat_trybinTM(lua_State *L, const TValue *p1, const TValue *p2, StkId
     }
     case TM_SUB: {
       if (tt_p2 == LUA_VQUAT) {
+#if defined(GLM_FORCE_DEFAULT_ALIGNED_GENTYPES)
+        const glm::qua<glm_Float> &x = glm_quatvalue(p1).q;
+        const glm::qua<glm_Float> &y = glm_quatvalue(p2).q;
+        const glm::qua<glm_Float> result = glm::detail::compute_quat_sub<glm_Float, glm::defaultp, false>::call(x, y);
+        glm_setvvalue2s(res, result, LUA_VQUAT);
+        return 1;
+#else
         glm_setvvalue2s(res, glm_quatvalue(p1).q - glm_quatvalue(p2).q, LUA_VQUAT);
         return 1;
+#endif
       }
       break;
     }
@@ -1984,7 +2003,16 @@ static int quat_trybinTM(lua_State *L, const TValue *p1, const TValue *p2, StkId
         case LUA_VNUMINT: glm_setvvalue2s(res, v.q * cast_glmfloat(ivalue(p2)), LUA_VQUAT); return 1;
         case LUA_VNUMFLT: glm_setvvalue2s(res, v.q * cast_glmfloat(fltvalue(p2)), LUA_VQUAT); return 1;
         case LUA_VVECTOR3: glm_setvvalue2s(res, v.q * glm_vecvalue(p2).v3, LUA_VVECTOR3); return 1;
+#if defined(GLM_FORCE_DEFAULT_ALIGNED_GENTYPES)
+        case LUA_VVECTOR4: {
+          const glm::vec<4, glm_Float> &y = glm_vecvalue(p2).v4;
+          const glm::vec<4, glm_Float> result = glm::detail::compute_quat_mul_vec4<glm_Float, glm::defaultp, false>::call(v.q, y);
+          glm_setvvalue2s(res, result, LUA_VVECTOR4);
+          return 1;
+        }
+#else
         case LUA_VVECTOR4: glm_setvvalue2s(res, v.q * glm_vecvalue(p2).v4, LUA_VVECTOR4); return 1;
+#endif
         case LUA_VQUAT: glm_setvvalue2s(res, v.q * glm_quatvalue(p2).q, LUA_VQUAT); return 1;
         default:
           break;
