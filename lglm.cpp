@@ -428,7 +428,7 @@ int glmVec_equalKey(const TValue *k1, const Node *n2, int rtt) {
   }
 }
 
-size_t glmcVec_hash(const Value *kvl, int ktt) {
+size_t glmVec_hash(const Value *kvl, int ktt) {
   // Uses a custom glm::hash implementation without the dependency on std::hash
   switch (withvariant(ktt)) {
     case LUA_VVECTOR2: return glm::hash::hash(glm_vvalue_raw(*kvl).v2);
@@ -438,6 +438,26 @@ size_t glmcVec_hash(const Value *kvl, int ktt) {
     default:
       return 0xDEAD;  // C0D3
   }
+}
+
+namespace glm {
+  /// <summary>
+  /// Return true if each component of the vector is finite.
+  /// </summary>
+  template<length_t L, typename T, qualifier Q>
+  GLM_FUNC_DECL bool __isfinite(vec<L, T, Q> const &v);
+}
+
+int glmVec_isfinite(const TValue *obj) {
+  switch (ttypetag(obj)) {
+    case LUA_VVECTOR2: return glm::__isfinite(glm_vecvalue(obj).v2);
+    case LUA_VVECTOR3: return glm::__isfinite(glm_vecvalue(obj).v3);
+    case LUA_VVECTOR4: return glm::__isfinite(glm_vecvalue(obj).v4);
+    case LUA_VQUAT: return glm::__isfinite(glm_quatvalue(obj).v4); // @HACK
+    default:
+      break;
+  }
+  return 0;
 }
 
 int glmVec_next(const TValue *obj, StkId key) {
@@ -958,6 +978,21 @@ LUA_API const char *glm_pushstring(lua_State *L, int idx) {
 
 namespace glm {
   /// <summary>
+  /// Return true if all components of the vector are finite.
+  ///
+  /// @NOTE: -ffast-math will break this condition.
+  /// </summary>
+  template<length_t L, typename T, qualifier Q>
+  GLM_FUNC_QUALIFIER bool __isfinite(vec<L, T, Q> const &v) {
+    GLM_STATIC_ASSERT(std::numeric_limits<T>::is_iec559, "'isnan' only accept floating-point inputs");
+
+    bool result = true;
+    for (length_t l = 0; l < L; ++l)
+      result &= glm::isfinite(v[l]);
+    return result;
+  }
+
+  /// <summary>
   /// Improved slerp implementation for generalized vectors.
   /// </summary>
   template<length_t L, typename T, qualifier Q>
@@ -1324,7 +1359,7 @@ static glm::length_t PopulateVectorObject(lua_State *L, int idx, glm::vec<4, T> 
   }
   else if (ttistable(value)) {  // Array: concatenate values.
     const glm::length_t dims = i_glmlen(luaH_getn(hvalue(value)));
-    const glm::length_t length = std::min(dims, v_desired - v_idx);
+    const glm::length_t length = glm::min(dims, v_desired - v_idx);
     for (glm::length_t j = 1; j <= length; ++j) {
       const TValue *t_val = luaH_getint(hvalue(value), i_luaint(j));
       if (!glm_castvalue(t_val, vec[v_idx++]))  // Primitive type: cast & store it.
@@ -1414,7 +1449,7 @@ static bool PopulateMatrix(lua_State *L, int idx, bool fixed_size, glmMatrix &m,
     // If there is only one element to be parsed and it is a table, assume the
     // matrix is packed within an array; otherwise, use the elements on the stack.
     const bool as_table = stack_count == 1 && ttistable(o);
-    const glm::length_t column_limit = as_table ? m.size : std::min(m.size, i_glmlen(stack_count));
+    const glm::length_t column_limit = as_table ? m.size : glm::min(m.size, i_glmlen(stack_count));
     if (fixed_size && column_limit < m.size)
       return false;
 
@@ -1507,14 +1542,12 @@ static int glm_createVector(lua_State *L, glm::length_t desiredSize = 0) {
 template<typename T>
 static int glm_createMatrix(lua_State *L, glm::length_t C, glm::length_t R) {
   const int top = _gettop(L);
-  bool success = false;
 
   glmMatrix result;
   result.size = (C == 0) ? 4 : C;
   result.secondary = (R == 0) ? 4 : R;
 
   if (top == 0) {  // If there are no elements, return the identity matrix
-    success = true;
     switch (result.secondary) {
       case 2: result.m42 = glm::identity<glm::mat<4, 2, T>>(); break;
       case 3: result.m43 = glm::identity<glm::mat<4, 3, T>>(); break;
@@ -1522,13 +1555,12 @@ static int glm_createMatrix(lua_State *L, glm::length_t C, glm::length_t R) {
       default:
         break;
     }
+    return glm_pushmat(L, result);
   }
   else {  // Parse the contents of the stack and populate 'result'
     const TValue *o = glm_index2value(L, 1);
-    const int start_idx = (top > 1 && ttismatrix(o)) ? 2 : 1;
-    if (PopulateMatrix(L, start_idx, (C != 0 || R != 0), result, result.size, result.secondary)) {
-      success = true;
-
+    const bool recycle = top > 1 && ttismatrix(o);
+    if (PopulateMatrix(L, recycle ? 2 : 1, (C != 0 || R != 0), result, result.size, result.secondary)) {
       // Realign column-vectors, ensuring the matrix can be faithfully
       // represented by its m.mCR union value.
       switch (result.secondary) {
@@ -1540,7 +1572,7 @@ static int glm_createMatrix(lua_State *L, glm::length_t C, glm::length_t R) {
       }
 
       // The first argument was a 'matrix' intended to be recycled.
-      if (start_idx > 1) {
+      if (recycle) {
         const TValue *orec = GLM_NULLPTR;
 
         lua_pushvalue(L, 1);
@@ -1550,10 +1582,10 @@ static int glm_createMatrix(lua_State *L, glm::length_t C, glm::length_t R) {
         lua_unlock(L);
         return 1;
       }
+      return glm_pushmat(L, result);
     }
   }
-  return success ? glm_pushmat(L, result)
-                 : luaL_error(L, INVALID_MATRIX_STRUCTURE);
+  return luaL_error(L, INVALID_MATRIX_STRUCTURE);
 }
 
 LUA_API int glmVec_vec(lua_State *L) { return glm_createVector<glm_Float>(L); }

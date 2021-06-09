@@ -72,7 +72,7 @@ IF( MSVC )
   ENDIF()
 
   IF(MSVC AND NOT (${CMAKE_BUILD_TYPE} MATCHES Debug))
-    SET(MSVC_OPT_FLAG "/Ox /DNDEBUG")
+    SET(MSVC_OPT_FLAG "/O2 /DNDEBUG")
   ELSE()
     SET(MSVC_OPT_FLAG "")
   ENDIF()
@@ -99,7 +99,7 @@ IF( MSVC )
   ADD_COMPILE_DEFINITIONS(_CRT_SECURE_NO_DEPRECATE)
   ADD_COMPILE_DEFINITIONS(_CRT_NONSTDC_NO_DEPRECATE)
 
-  SET(LUA_C_FLAGS "${MSVC_OPT_FLAG} /Ob2 /Oi /Ot /GT /GF /GS- /MP /EHsc /GL")
+  SET(LUA_C_FLAGS "${MSVC_OPT_FLAG} /Ob2 /Oi /Ot /GT /GF /GS- /MT /EHsc /GL")
   SET(LUA_REL_FLAGS "${LUA_REL_FLAGS} /GL")
   SET(LUA_LINKFLAGS "${LUA_LINKFLAGS} /LTCG")
 
@@ -189,9 +189,9 @@ ELSE()
 
   # Compile everything, or lglm.cpp, or nothing with -ffast-math
   IF( LUA_FAST_MATH )
-    ADD_COMPILE_OPTIONS(-ffast-math)
+    ADD_COMPILE_OPTIONS(-ffast-math -fno-finite-math-only)
   ELSEIF( GLM_FAST_MATH )
-    SET(glm_nativeFlags "${glm_nativeFlags} -ffast-math")
+    SET(glm_nativeFlags "${glm_nativeFlags} -ffast-math -fno-finite-math-only")
   ENDIF()
 
   # Compile everything, lglm.cpp, or nothing with common performance tweaks
@@ -264,6 +264,8 @@ ELSE()
       #-Wno-gnu-label-as-value
       #-Wno-nested-anon-types
       #-Wno-enum-enum-conversion
+      #-Wno-documentation-unknown-command
+      #-Wno-float-equal
     )
   ELSEIF( CMAKE_COMPILER_IS_GNUCXX )
     ADD_COMPILE_OPTIONS(-fmax-errors=5 -Wduplicated-cond -Wrestrict -Wlogical-op
@@ -621,12 +623,10 @@ IF( GLM_FORCE_INLINE )
   ADD_COMPILE_DEFINITIONS(GLM_FORCE_INLINE)
 ENDIF()
 
-IF( GLM_FORCE_ALIGNED_GENTYPES )
-  ADD_COMPILE_DEFINITIONS(GLM_FORCE_ALIGNED_GENTYPES)
-ENDIF()
-
 IF( GLM_FORCE_DEFAULT_ALIGNED_GENTYPES )
   ADD_COMPILE_DEFINITIONS(GLM_FORCE_DEFAULT_ALIGNED_GENTYPES)
+ELSEIF( GLM_FORCE_ALIGNED_GENTYPES )
+  ADD_COMPILE_DEFINITIONS(GLM_FORCE_ALIGNED_GENTYPES)
 ENDIF()
 
 IF( GLM_FORCE_INTRINSICS )
@@ -881,12 +881,7 @@ ENDIF()
 IF( ONE_LUA )
   TARGET_LINK_LIBRARIES(lua ${LIBS} ${LUA_LIBS})
 ELSE()
-  IF( LUA_INCLUDE_TEST )
-    SET(interpretor_target liblua_static)
-  ELSE()
-    SET(interpretor_target liblua)
-  ENDIF()
-
+  SET(interpretor_target liblua_static)
   TARGET_LINK_LIBRARIES(lua ${interpretor_target} ${LIBS} ${LUA_LIBS})
 ENDIF()
 
