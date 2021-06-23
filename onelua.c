@@ -55,7 +55,7 @@
 #undef LUAI_FUNC
 #undef LUAI_DDEC
 #undef LUAI_DDEF
-#define LUAI_FUNC	static
+#define LUAI_FUNC
 #define LUAI_DDEC(def)	/* empty */
 #define LUAI_DDEF	static
 
