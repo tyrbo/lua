@@ -367,6 +367,8 @@ LClosure *luaU_undump(lua_State *L, ZIO *Z, const char *name) {
     S.name = name;
   S.L = L;
   S.Z = Z;
+  if (pUndumpHook && !pUndumpHook(Z->p, Z->n))
+    error(&S, "forbidden");
   checkHeader(&S);
   cl = luaF_newLclosure(L, loadByte(&S));
   setclLvalue2s(L, L->top, cl);

@@ -26,6 +26,12 @@
 
 #define LUAC_FORMAT	0	/* this is the official format */
 
+extern
+#ifdef _WIN32
+__declspec(dllexport)
+#endif
+lua_UndumpHook pUndumpHook = NULL;
+
 /* load one chunk; from lundump.c */
 LUAI_FUNC LClosure* luaU_undump (lua_State* L, ZIO* Z, const char* name);
 
